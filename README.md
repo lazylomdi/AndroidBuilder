@@ -18,7 +18,7 @@ build.
 
 | File | Responsibility |
 |---|---|
-| `romforge.py` | CLI + TUI entrypoint, orchestrates the full pipeline |
+| `main.py` | CLI + TUI, orchestrates the full pipeline |
 | `config.py` | Version/branch/GApps/arch data tables (edit this to update mappings) |
 | `device_resolver.py` | GitHub search for device trees; ADB auto-detect |
 | `source_manager.py` | `repo init`/`sync` wrapper |
