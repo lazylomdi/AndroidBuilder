@@ -238,6 +238,7 @@ MAGISK = {
     "patch_method": "boot_image",  # preferred: patch boot.img post-build, not in-tree su
 }
 
+<<<<<<< HEAD
 # Custom recovery images. Verified sources as of June 2026.
 # TWRP (Team Win Recovery Project) -- largest device coverage, oldest
 # Source: https://twrp.me/Devices/
@@ -314,6 +315,8 @@ SELINUX_NOTES = (
 # special compilation needed, just a correctly-structured zip.
 BOOT_ANIMATION_PATH = "system/media/bootanimation.zip"
 
+=======
+>>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
 # Disk/RAM sanity thresholds the tool checks before attempting a build.
 MIN_FREE_DISK_GB = 150
 MIN_RAM_GB = 16

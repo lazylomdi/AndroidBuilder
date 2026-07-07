@@ -43,8 +43,12 @@ from pathlib import Path
 
 from config import (GAPPS_CATALOG, MAGISK, NIKGAPPS_VARIANTS,
                      NIKGAPPS_SOURCEFORGE_BASE, INITD_SYSINIT_SERVICE_SNIPPET,
+<<<<<<< HEAD
                      INITD_MAX_USEFUL_API, BOOT_ANIMATION_PATH, RADIO_NOTES,
                      SELINUX_NOTES, RECOVERY_SOURCES)
+=======
+                     INITD_MAX_USEFUL_API)
+>>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
 
 
 def resolve_gapps(api_level: int, arch: str) -> dict | None:
@@ -303,6 +307,7 @@ def patch_boot_image_with_magisk(boot_img: Path, magisk_apk: Path, dry_run: bool
         "tool guessing at magiskboot invocation flags for your specific device."
     )
     return True
+<<<<<<< HEAD
 
 
 def stage_boot_animation(workdir: Path, animation_zip: Path,
@@ -365,3 +370,5 @@ def search_recovery_trees(codename: str, vendor: str | None,
         queries, match_token=codename, vendor_token=vendor,
         kind_keywords={"recovery": ["recovery", "twrp", "orangefox", "shrp"]},
     )
+=======
+>>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
