@@ -65,7 +65,7 @@ python3 romforge.py build --version 11 --codename d2att --vendor samsung \
     --dry-run
 ```
 
-## TUI mode
+## TUI
 
 Running `python3 romforge.py` with no arguments (or `python3 romforge.py
 tui` explicitly) drops into an arrow-key menu that asks the same questions
@@ -79,7 +79,7 @@ collect the same parameters, not a separate code path.
 If `questionary` isn't installed, TUI mode prints an install hint and
 exits; the CLI subcommands keep working without it.
 
-## What each pipeline stage actually does
+## What each stage actually does
 
 1. **Version selection** — looks up the Android version in `config.py`,
    prints its viability rating (`good` / `fragile` / `archival-only`) so
@@ -173,7 +173,7 @@ exits; the CLI subcommands keep working without it.
   run the `local` backend there. A fourth code path would just be these
   same shell commands with extra indirection.
 
-## Verified-against-source notes (checked June 2026)
+## verified-against-source notes (checked June 2026)
 
 - **AOSP's release model changed in 2026.** Source now publishes twice a
   year (Q2/Q4) under a trunk-stable model, and Google's documented branch
@@ -192,7 +192,7 @@ exits; the CLI subcommands keep working without it.
 
 ## Limitations (read this before a long build)
 
-- **Android 4–6 are rated `archival-only`.** Old toolchains often don't
+- **Android 4–6 are rated `archival-only`.** Old versions often don't
   build on modern Ubuntu/glibc, and most public device trees from this
   era are dead or abandoned (this was the CyanogenMod era, pre-dating
   LineageOS). This tool will still attempt the steps, but no script can
