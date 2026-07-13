@@ -89,9 +89,7 @@ class SourceManager:
         if info.notes:
             print(f"  Note: {info.notes}")
 
-<<<<<<< HEAD
         init_cmd = ["repo", "init", "-u", self.manifest_url(), "-b", branch]
-=======
         self.workdir.mkdir(parents=True, exist_ok=True)
         init_cmd = ["repo", "init", "-u", self.manifest_url(), "-b", branch]
         # The --partial-clone/--no-use-superproject flags are part of
@@ -99,7 +97,6 @@ class SourceManager:
         # header). They're harmless on LineageOS manifests too, but we only
         # apply them for source="aosp" to stay close to each project's own
         # documented instructions rather than mixing conventions.
->>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
         if self.source == "aosp":
             init_cmd[2:2] = AOSP_REPO_INIT_EXTRA_FLAGS
         sync_cmd = ["repo", "sync", "-c", "-j", str(jobs), "--force-sync"]
@@ -109,10 +106,7 @@ class SourceManager:
             print(f"  [dry-run] would run in {self.workdir}: {' '.join(sync_cmd)}")
             return True
 
-<<<<<<< HEAD
         self.workdir.mkdir(parents=True, exist_ok=True)
-=======
->>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
         try:
             subprocess.run(init_cmd, cwd=self.workdir, check=True)
             subprocess.run(sync_cmd, cwd=self.workdir, check=True)
@@ -123,7 +117,6 @@ class SourceManager:
             return False
         return True
 
-<<<<<<< HEAD
     def detect_state(self) -> dict:
         """
         Non-destructively scan the workdir to determine what has already
@@ -166,8 +159,6 @@ class SourceManager:
             mark = "✓" if state[key] else "✗"
             print(f"    {mark}  {label}")
 
-=======
->>>>>>> 569c9bad1ff47876aa62b79a66e6b46ec3fba4a3
     def clone_device_trees(self, clone_urls: dict[str, str], dry_run: bool = False) -> bool:
         """
         clone_urls: {"device": url, "vendor": url, "kernel": url} (any subset)
