@@ -57,6 +57,7 @@ def main_menu() -> str | None:
     return _q(questionary.select, message="What do you want to do?",
               choices=[
                   "Build a ROM",
+                  "Treble / non-Treble port assistant",
                   "Find device trees",
                   "List Android versions",
                   "Detect connected device",

@@ -5,29 +5,7 @@ Every function here either:
   (a) actually works end-to-end, or
   (b) clearly documents that it's a manual step and exactly what to do.
 
-<<<<<<< HEAD
 No half-implementations that look automated but silently do nothing.
-=======
-  - Custom apps / wallpapers: copies user-provided APKs and image files
-    into the standard product overlay paths
-    (vendor/<x>/overlay/... and product/etc/... ) BEFORE the build runs,
-    since these need to be compiled into the system image.
-
-  - Tweaks/mods: searches GitHub for Magisk/KernelSU module repos matching
-    a free-text query (same search-and-pick pattern as device/kernel
-    trees) and stages the chosen module(s) for inclusion, rather than
-    bundling a fixed list of specific tweaks that would go stale.
-
-  - init.d support: a LEGACY mechanism (see config.py notes) relevant
-    mostly to Android 4-9-era CM/early-Lineage builds. Creates the
-    /system/etc/init.d directory structure in the source tree and writes
-    out the documented init.rc service snippet as a reference file --
-    does NOT blindly patch an arbitrary boot image's ramdisk, since the
-    exact patch point is kernel/device-specific.
-
-  - Root: patches the *output* boot.img with Magisk AFTER the build
-    completes. This is deliberately done post-build rather than via
->>>>>>> 7c5254ed76103d9d10fe40261c9f03411338ffd6
 """
 
 import json
@@ -39,10 +17,6 @@ from pathlib import Path
 import github_client
 from config import GAPPS_BY_API, NIKGAPPS_VARIANTS, NIKGAPPS_SF_BASE, MAGISK_RELEASES_API
 
-from config import (GAPPS_CATALOG, MAGISK, NIKGAPPS_VARIANTS,
-                    NIKGAPPS_SOURCEFORGE_BASE, INITD_SYSINIT_SERVICE_SNIPPET,
-                    INITD_MAX_USEFUL_API, BOOT_ANIMATION_PATH, RADIO_NOTES,
-                    SELINUX_NOTES, RECOVERY_SOURCES, INITD_MAX_USEFUL_API)
 
 # ── GApps ─────────────────────────────────────────────────────────────────────
 
@@ -320,64 +294,3 @@ def enable_initd(workdir: Path, codename: str, api_level: int,
     print(f"  Created init.d directory: {initd_dir}")
     print(f"  Read {notes_path} for the manual init.rc patch step.")
     return True
-
-def stage_boot_animation(workdir: Path, animation_zip: Path,
-                          dry_run: bool = False) -> bool:
-    """
-    Copy a user-provided bootanimation.zip to the correct location in the
-    source tree before build. Structure of a valid bootanimation.zip:
-      desc.txt   -- width height fps / p <loop> <pause> <partN>
-      part0/     -- PNG frames numbered 0000.png, 0001.png, ...
-      part1/     -- (optional further parts)
-    The build system picks it up from system/media/bootanimation.zip
-    automatically -- no makefile entry needed for this one.
-    Source: AOSP frameworks/base/cmds/bootanimation/
-    """
-    if not animation_zip.exists():
-        print(f"  Boot animation zip not found: {animation_zip}")
-        return False
-    dest = workdir / BOOT_ANIMATION_PATH
-    if dry_run:
-        print(f"  [dry-run] would copy {animation_zip} -> {dest}")
-        return True
-    dest.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(animation_zip, dest)
-    print(f"  Staged boot animation: {dest}")
-    print(f"  Note: your zip must contain desc.txt + numbered PNG frames in "
-          f"part*/ subdirectories. If the animation is garbled or missing, "
-          f"verify the zip structure against AOSP's bootanimation format.")
-    return True
-
-
-def surface_radio_notes() -> None:
-    """Print a clear reminder that radio firmware is out of scope for a
-    ROM build and must be handled separately."""
-    print(f"\n  [RADIO/MODEM NOTE] {RADIO_NOTES}")
-
-
-def surface_selinux_notes(viability: str) -> None:
-    """Print SELinux guidance, louder on archival/fragile builds where
-    sepolicy mismatches are most common."""
-    if viability in ("archival-only", "fragile"):
-        print(f"\n  [SELINUX WARNING] {SELINUX_NOTES}")
-
-
-def search_recovery_trees(codename: str, vendor: str | None,
-                            recovery: str = "twrp") -> list:
-    """
-    Search GitHub for a recovery device tree for the chosen recovery
-    project (twrp/orangefox/skyhawk) using the same search pattern as
-    device trees. Returns a list of RepoCandidate objects, same as
-    search_device_trees(). Imported lazily to avoid circular imports.
-    """
-    from device_resolver import _search_repos
-    src = RECOVERY_SOURCES.get(recovery, RECOVERY_SOURCES["twrp"])
-    orgs = src["github_orgs"]
-    queries = [f"org:{org} {codename} in:name" for org in orgs]
-    vendor_str = vendor or ""
-    queries.append(f"{codename} {recovery} recovery android")
-    queries.append(f"android_device_{vendor_str}_{codename} recovery")
-    return _search_repos(
-        queries, match_token=codename, vendor_token=vendor,
-        kind_keywords={"recovery": ["recovery", "twrp", "orangefox", "shrp"]},
-    )
