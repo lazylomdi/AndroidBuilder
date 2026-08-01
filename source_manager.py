@@ -89,6 +89,7 @@ class SourceManager:
         if info.notes:
             print(f"  Note: {info.notes}")
 
+        init_cmd = ["repo", "init", "-u", self.manifest_url(), "-b", branch]
         self.workdir.mkdir(parents=True, exist_ok=True)
         init_cmd = ["repo", "init", "-u", self.manifest_url(), "-b", branch]
         # The --partial-clone/--no-use-superproject flags are part of
@@ -105,6 +106,7 @@ class SourceManager:
             print(f"  [dry-run] would run in {self.workdir}: {' '.join(sync_cmd)}")
             return True
 
+        self.workdir.mkdir(parents=True, exist_ok=True)
         try:
             subprocess.run(init_cmd, cwd=self.workdir, check=True)
             subprocess.run(sync_cmd, cwd=self.workdir, check=True)
@@ -114,6 +116,48 @@ class SourceManager:
                   f"a network interruption mid-sync (safe to re-run repo sync).")
             return False
         return True
+
+    def detect_state(self) -> dict:
+        """
+        Non-destructively scan the workdir to determine what has already
+        been completed. Returns a dict with boolean keys so cmd_build can
+        skip steps that are already done rather than re-running them from
+        scratch -- this is the "resume from existing synced files" path.
+
+        Keys:
+          repo_initialized : .repo/manifest.xml exists (repo init ran)
+          source_synced    : .repo/ exists + build/envsetup.sh exists
+                             (repo sync completed enough to build)
+          device_tree      : device/ directory has at least one subdir
+          vendor_tree      : vendor/ directory has at least one subdir
+          kernel_tree      : kernel/ directory has at least one subdir
+          build_complete   : out/target/product/ has at least one .zip
+        """
+        wd = self.workdir
+        repo_dir = wd / ".repo"
+        return {
+            "repo_initialized": (repo_dir / "manifest.xml").exists(),
+            "source_synced": (repo_dir.exists() and (wd / "build" / "envsetup.sh").exists()),
+            "device_tree": any((wd / "device").iterdir()) if (wd / "device").exists() else False,
+            "vendor_tree": any((wd / "vendor").iterdir()) if (wd / "vendor").exists() else False,
+            "kernel_tree": any((wd / "kernel").iterdir()) if (wd / "kernel").exists() else False,
+            "build_complete": any((wd / "out" / "target" / "product").rglob("*.zip"))
+                              if (wd / "out" / "target" / "product").exists() else False,
+        }
+
+    def print_state(self, state: dict) -> None:
+        labels = {
+            "repo_initialized": "repo init",
+            "source_synced": "repo sync (source tree)",
+            "device_tree": "device tree",
+            "vendor_tree": "vendor tree",
+            "kernel_tree": "kernel tree",
+            "build_complete": "build artifact (.zip)",
+        }
+        print("  Current workdir state:")
+        for key, label in labels.items():
+            mark = "✓" if state[key] else "✗"
+            print(f"    {mark}  {label}")
 
     def clone_device_trees(self, clone_urls: dict[str, str], dry_run: bool = False) -> bool:
         """

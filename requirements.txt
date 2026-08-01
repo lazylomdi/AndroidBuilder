@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # romforge runtime dependencies
 #
 # Core pipeline (config, github_client, device_resolver, pipeline,
@@ -38,3 +39,20 @@ questionary>=2.0        # arrow-key menus (pulls in prompt_toolkit, wcwidth)
 #   Authenticated:  5,000 API req/hr (set once in TUI Settings or GITHUB_TOKEN env)
 #   Create a token at: https://github.com/settings/tokens
 #   No scopes needed — public repo read access only.
+=======
+# romforge's CLI subcommands (list-versions, find-device, detect-device,
+# build with explicit flags) use only the Python standard library.
+#
+# The interactive TUI mode (`python3 romforge.py tui`, or running with no
+# arguments at all) needs questionary for arrow-key menus:
+questionary>=2.0
+# If questionary isn't installed, the TUI mode prints a message and exits
+# rather than crashing -- the CLI subcommands still work without it.
+
+# External, non-Python tools you need on PATH depending on what you use:
+#   - repo        https://source.android.com/setup/develop#installing-repo
+#   - git
+#   - adb         (only for `detect-device` / auto-detection during `build`)
+#   - docker      (only for --backend docker)
+#   - gh CLI      (optional, only for triggering --backend github-actions workflows)
+>>>>>>> 7c5254ed76103d9d10fe40261c9f03411338ffd6
