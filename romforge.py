@@ -25,7 +25,6 @@ def _run_build(cfg: dict) -> None:
                            save_state, print_state, launch_background)
     from backends import get_backend
     from customizer import (stage_gapps, stage_assets, stage_boot_animation,
-                              stage_tweak_modules if False else lambda *a, **k: None,
                               enable_initd, fetch_magisk, patch_boot_with_magisk)
     import shutil, subprocess
     from config import VERSIONS
