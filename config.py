@@ -106,3 +106,50 @@ MAGISK_RELEASES_API = "https://api.github.com/repos/topjohnwu/Magisk/releases/la
 # Build sanity thresholds.
 MIN_DISK_GB  = 150
 MIN_RAM_GB   = 16
+
+# ── Lunch release codes ────────────────────────────────────────────────────────
+# Starting with Android 14 QPR2 (mid-2024), Google changed the lunch format
+# from <product>-<variant> to <product>-<release>-<variant>.
+# LineageOS lineage-21+ and AOSP Android 14+ require this three-part form.
+# Older branches (lineage-20 and below, AOSP <14) still use the old two-part
+# form and will FAIL if given a release code.
+#
+# Verified sources:
+#   groups.google.com/g/android-building/c/TvKKsSLSlPY  (ap1a confirmation)
+#   groups.google.com/g/android-building/c/z7gYowDYQfk  (Android 15 ap3a)
+#   gist.github.com/eepymeowers/ce62de00da763d87ab03e539161a564f (full table)
+#   github.com/itsfragilecode/android (lineage_veux-ap2a-userdebug example)
+#
+# Format: (lineage_branch or None) → release_code
+# None = applies to raw AOSP at that API level
+# Use the LATEST release code for each branch as the default.
+LUNCH_RELEASE_CODES: dict[str, str | None] = {
+    # Old branches — no release code, use legacy <product>-<variant> format
+    "cm-11.0":      None,
+    "cm-12.1":      None,
+    "cm-13.0":      None,
+    "lineage-14.1": None,
+    "lineage-15.1": None,
+    "lineage-16.0": None,
+    "lineage-17.1": None,
+    "lineage-18.1": None,
+    "lineage-19.1": None,
+    "lineage-20":   None,
+    # Modern branches — three-part format required
+    # lineage-21 shipped with Android 14; latest QPR is AP4A
+    "lineage-21":   "ap4a",
+    # lineage-22 / lineage-22.1 are Android 15 — latest QPR is BP1A
+    "lineage-22":   "bp1a",
+    "lineage-22.1": "bp1a",
+    # lineage-23 / lineage-23.2 are Android 15/16 — BP2A+
+    "lineage-23":   "bp2a",
+    "lineage-23.2": "bp4a",
+}
+
+# AOSP release codes by API level (for --source aosp builds)
+# Only needed for API 34+ (Android 14+)
+AOSP_RELEASE_CODES: dict[int, str | None] = {
+    34: "ap4a",   # Android 14 latest QPR
+    35: "bp1a",   # Android 15 QPR2
+}
+

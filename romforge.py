@@ -22,7 +22,8 @@ from pathlib import Path
 def _run_build(cfg: dict) -> None:
     """Execute the full build pipeline from a config dict."""
     from build_pipeline import (check_host, repo_sync, clone_tree, load_state,
-                           save_state, print_state, launch_background)
+                           save_state, print_state, launch_background,
+                           build_lunch_target)
     from build_pipeline import get_backend
     from customizer import (stage_gapps, stage_assets, stage_boot_animation,
                               enable_initd, fetch_magisk, patch_boot_with_magisk)
@@ -147,7 +148,13 @@ def _run_build(cfg: dict) -> None:
                 print(f"    Flashable ROM: {z}")
     else:
         backend = get_backend(cfg.get("backend", "local"))
-        lunch_target = cfg.get("lunch_target") or f"lineage_{codename}-userdebug"
+        lunch_target = cfg.get("lunch_target") or build_lunch_target(
+            rom_prefix="lineage" if source == "lineage" else "aosp",
+            codename=codename,
+            variant="userdebug",
+            version=version,
+            source=source,
+        )
 
         if cfg.get("backend") == "github-actions":
             from build_pipeline import manifest_url, branch_for

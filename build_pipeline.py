@@ -344,18 +344,115 @@ def repo_sync(workdir: Path, version: str, source: str,
 
 # ── Tree cloning ───────────────────────────────────────────────────────────────
 
+def _parse_tree_path(clone_url: str, kind: str) -> tuple[str, str] | None:
+    """
+    Parse a device/vendor/kernel repo URL into (vendor, codename) so we
+    can place the clone at the correct AOSP convention path.
+
+    Conventions seen in the wild:
+      android_device_{vendor}_{codename}   (LineageOS, most orgs)
+      device_{vendor}_{codename}           (AOKP, older trees)
+      android_kernel_{vendor}_{codename}
+      kernel_{vendor}_{soc}
+      proprietary_vendor_{vendor}          (TheMuppets)
+      proprietary_vendor_{vendor}_{codename}
+
+    Returns (vendor, name) where name is the codename for device trees
+    or the repo stem for everything else.
+    Returns None if parsing fails.
+    """
+    import re
+    name = Path(clone_url).stem  # strip .git and path
+    # Device and recovery trees
+    m = re.search(r'(?:android_)?device_([A-Za-z0-9]+)_(.+)$', name)
+    if m and kind in ("device", "recovery"):
+        return m.group(1), m.group(2)
+    # Vendor blobs
+    m = re.search(r'(?:android_|proprietary_)?vendor_([A-Za-z0-9]+)(?:_(.+))?$', name)
+    if m and kind == "vendor":
+        vendor = m.group(1)
+        subdir = m.group(2) or ""
+        return vendor, subdir
+    # Kernel trees
+    m = re.search(r'(?:android_)?kernel_([A-Za-z0-9]+)_(.+)$', name)
+    if m and kind == "kernel":
+        return m.group(1), m.group(2)
+    return None
+
+
+def build_lunch_target(rom_prefix: str, codename: str, variant: str,
+                        version: str, source: str) -> str:
+    """
+    Build the correct lunch target string for any Android version.
+
+    Old format (Android ≤13 / lineage-20 and below):
+        lineage_d2att-userdebug
+
+    New format (Android 14+ / lineage-21+):
+        lineage_d2att-ap4a-userdebug
+                          ^^^^ release code
+
+    The release code is determined from config.LUNCH_RELEASE_CODES (for
+    LineageOS) or config.AOSP_RELEASE_CODES (for raw AOSP builds) keyed
+    by the branch/API level. Using the wrong format causes:
+        "Invalid lunch combo: ... must be of the form <product>-<release>-<variant>"
+
+    Verified: github.com/itsfragilecode/android (lineage-21, ap2a example)
+              groups.google.com/g/android-building/c/z7gYowDYQfk (Android 15)
+    """
+    from config import (LUNCH_RELEASE_CODES, AOSP_RELEASE_CODES,
+                         VERSIONS, AOSP_ROLLING_BRANCH)
+
+    release_code: str | None = None
+    vinfo = VERSIONS.get(version)
+
+    if source == "lineage" and vinfo:
+        branch = vinfo.lineage_branch
+        release_code = LUNCH_RELEASE_CODES.get(branch)
+    elif source == "aosp" and vinfo:
+        release_code = AOSP_RELEASE_CODES.get(vinfo.api)
+
+    product = f"{rom_prefix}_{codename}"
+    if release_code:
+        return f"{product}-{release_code}-{variant}"
+    else:
+        return f"{product}-{variant}"
+
+
 def clone_tree(workdir: Path, kind: str, clone_url: str,
-                dry_run: bool = False) -> bool:
-    dest_map = {
-        "device":   "device",
-        "vendor":   "vendor",
-        "kernel":   "kernel",
-        "recovery": "device",   # recovery trees use the device/ convention
-    }
-    dest = workdir / dest_map.get(kind, "local") / Path(clone_url).stem
+               dry_run: bool = False) -> bool:
+    """
+    Clone a device/vendor/kernel/recovery tree into the correct AOSP path.
+
+    Path conventions (verified against LineageOS tree layout):
+      device trees  → device/{vendor}/{codename}
+      vendor blobs  → vendor/{vendor}/{codename or ''}
+      kernel trees  → kernel/{vendor}/{codename}
+      recovery      → device/{vendor}/{codename}  (same as device)
+
+    Falls back to workdir/{kind}/{repo-stem} if the URL doesn't match any
+    known naming convention.
+    """
+    parsed = _parse_tree_path(clone_url, kind)
+    if parsed:
+        vendor, subname = parsed
+        base_map = {"device": "device", "vendor": "vendor",
+                    "kernel": "kernel", "recovery": "device"}
+        base = workdir / base_map.get(kind, kind) / vendor
+        dest = base / subname if subname else base
+    else:
+        # Fallback: workdir/{kind}/{stem}
+        stem = Path(clone_url).stem
+        dest = workdir / kind / stem
+        print(f"  ⚠ Could not parse vendor/codename from URL '{clone_url}'")
+        print(f"    Cloning to fallback path: {dest}")
+        print(f"    You may need to move it to device/{{vendor}}/{{codename}}/ manually.")
+
     if dry_run:
-        print(f"  [dry-run] git clone --depth 1 {clone_url} {dest}")
+        print(f"  [dry-run] git clone --depth 1 {clone_url}")
+        print(f"            → {dest}")
         return True
+
     if dest.exists():
         print(f"  {dest.name} already exists, pulling latest...")
         try:
@@ -364,11 +461,14 @@ def clone_tree(workdir: Path, kind: str, clone_url: str,
         except subprocess.CalledProcessError:
             print(f"  Pull failed — using existing tree at {dest}")
         return True
+
     try:
+        dest.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
             ["git", "clone", "--depth", "1", clone_url, str(dest)],
             check=True,
         )
+        print(f"  Cloned {kind} tree → {dest.relative_to(workdir)}")
         return True
     except subprocess.CalledProcessError:
         print(f"  Failed to clone {kind} tree from {clone_url}")
