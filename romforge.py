@@ -148,6 +148,10 @@ def _run_build(cfg: dict) -> None:
                 print(f"    Flashable ROM: {z}")
     else:
         backend = get_backend(cfg.get("backend", "local"))
+        # rom_prefix here is only a fallback for unknown versions —
+        # build_lunch_target derives the real prefix (cm_/lineage_/aosp_)
+        # per-version internally, since CyanogenMod-era (4-6) builds use
+        # "cm", not "lineage".
         lunch_target = cfg.get("lunch_target") or build_lunch_target(
             rom_prefix="lineage" if source == "lineage" else "aosp",
             codename=codename,
@@ -162,7 +166,7 @@ def _run_build(cfg: dict) -> None:
             backend.run(
                 workdir, lunch_target, cfg.get("jobs", 4),
                 dry_run=dry_run,
-                manifest_url=manifest_url(source),
+                manifest_url=manifest_url(source, version),
                 branch=branch_for(version, source, cfg.get("use_latest_aosp", False)),
                 codename=codename,
                 version=version,

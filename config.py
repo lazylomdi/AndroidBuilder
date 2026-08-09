@@ -18,36 +18,69 @@ from dataclasses import dataclass
 class AndroidVersion:
     api: int
     aosp_tag: str           # historical pinned tag, still valid for old builds
-    lineage_branch: str     # LineageOS branch name
-    lineage_eol: bool       # True = no longer officially built by LineageOS
+    lineage_branch: str     # LineageOS or CyanogenMod branch name
+    lineage_eol: bool       # True = no longer officially built upstream
     viability: str          # "good" | "fragile" | "archival"
+    manifest_org: str       # GitHub org hosting the manifest for this branch
+    product_prefix: str     # lunch product prefix: "cm" or "lineage"
     note: str
 
 
+# manifest_org / product_prefix verified separately per era:
+#   CyanogenMod (Android 4-6, cm-* branches):
+#     manifest: github.com/CyanogenMod/android.git
+#     lunch prefix: cm_<codename>  (e.g. "lunch cm_d2att-userdebug")
+#     Sources: github.com/CyanogenMod/android (still live, branches cm-11.0
+#     through cm-14.1 exist in git history), multiple XDA guides confirming
+#     "lunch cm_<codename>-userdebug" as the CM lunch syntax.
+#   LineageOS (Android 7+, lineage-* branches):
+#     manifest: github.com/LineageOS/android.git
+#     lunch prefix: lineage_<codename>
+#     Source: github.com/LineageOS/android (current official manifest repo)
+#
+# IMPORTANT: these two manifests are NOT interchangeable. Pointing a cm-*
+# branch at the LineageOS manifest repo (or vice versa) causes widespread
+# "cannot initialize work tree" sync errors because the branch/revision
+# doesn't exist in that org's repos.
+_CM_ORG      = "CyanogenMod"
+_LINEAGE_ORG = "LineageOS"
+
 VERSIONS = {
     "4":  AndroidVersion(15,  "android-4.4_r1",       "cm-11.0",       True,  "archival",
+          _CM_ORG, "cm",
           "CyanogenMod era. GCC toolchains from this period don't build on modern Ubuntu without an old container (14.04/16.04)."),
     "5":  AndroidVersion(22,  "android-5.1.1_r38",    "cm-12.1",       True,  "archival",
+          _CM_ORG, "cm",
           "Lollipop, CyanogenMod era. Same toolchain rot as Android 4."),
     "6":  AndroidVersion(23,  "android-6.0.1_r81",    "cm-13.0",       True,  "archival",
+          _CM_ORG, "cm",
           "Last major CyanogenMod branch. Some device trees still exist but expect patching."),
     "7":  AndroidVersion(25,  "android-7.1.2_r39",    "lineage-14.1",  True,  "fragile",
-          "First LineageOS-branded branch. EOL — no upstream fixes."),
+          _LINEAGE_ORG, "lineage",
+          "First LineageOS-branded branch (LineageOS succeeded CyanogenMod in late 2016). EOL — no upstream fixes."),
     "8":  AndroidVersion(27,  "android-8.1.0_r81",    "lineage-15.1",  True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "Treble introduced here. EOL upstream."),
     "9":  AndroidVersion(28,  "android-9.0.0_r61",    "lineage-16.0",  True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "Last branch where LineageOS in-tree su addon was supported."),
     "10": AndroidVersion(29,  "android-10.0.0_r47",   "lineage-17.1",  True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "EOL upstream."),
     "11": AndroidVersion(30,  "android-11.0.0_r48",   "lineage-18.1",  True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "EOL 2024-03-05, 52 devices dropped from official LineageOS builds."),
     "12": AndroidVersion(32,  "android-12.1.0_r10",   "lineage-19.1",  True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "EOL upstream. GSI/emulator lunch targets split from device targets here."),
     "13": AndroidVersion(33,  "android-13.0.0_r75",   "lineage-20",    True,  "fragile",
+          _LINEAGE_ORG, "lineage",
           "EOL'd when lineage-23.x became stable."),
     "14": AndroidVersion(34,  "android-14.0.0_r41",   "lineage-21",    False, "good",
+          _LINEAGE_ORG, "lineage",
           "Still receiving device submissions as of Changelog 31."),
     "15": AndroidVersion(35,  "android-15.0.0_r20",   "lineage-23.2",  False, "good",
+          _LINEAGE_ORG, "lineage",
           "Current LineageOS stable. Best-supported option."),
 }
 

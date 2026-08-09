@@ -280,17 +280,33 @@ def check_host() -> list[str]:
 
 # ── Source sync ────────────────────────────────────────────────────────────────
 
-def manifest_url(source: str) -> str:
-    return ("https://github.com/LineageOS/android.git" if source == "lineage"
-            else "https://android.googlesource.com/platform/manifest")
+def manifest_url(source: str, version: str | None = None) -> str:
+    """
+    Return the correct manifest URL. For source="lineage" this depends on
+    the SPECIFIC version: Android 4-6 use CyanogenMod's manifest org,
+    Android 7+ use LineageOS's. These are two different GitHub orgs with
+    incompatible branch sets — pointing a cm-* branch at LineageOS/android
+    (or vice versa) causes widespread "cannot initialize work tree" sync
+    errors because the branch doesn't exist there.
+
+    Verified: github.com/CyanogenMod/android (cm-11.0 through cm-14.1),
+              github.com/LineageOS/android (lineage-14.1 onward, current).
+    """
+    if source != "lineage":
+        return "https://android.googlesource.com/platform/manifest"
+    if version is not None and version in VERSIONS:
+        org = VERSIONS[version].manifest_org
+        return f"https://github.com/{org}/android.git"
+    return "https://github.com/LineageOS/android.git"  # fallback
 
 
 def branch_for(version: str, source: str, use_latest: bool = False) -> str:
     v = VERSIONS[version]
     if source == "lineage":
         if v.lineage_eol:
+            project = "CyanogenMod" if v.manifest_org == "CyanogenMod" else "LineageOS"
             print(f"  ⚠ {v.lineage_branch} is EOL — no official builds or "
-                  f"upstream fixes from LineageOS.")
+                  f"upstream fixes from {project}.")
         return v.lineage_branch
     return AOSP_ROLLING_BRANCH if use_latest else v.aosp_tag
 
@@ -299,8 +315,18 @@ def repo_sync(workdir: Path, version: str, source: str,
                use_latest: bool = False, jobs: int = 4,
                dry_run: bool = False) -> bool:
     branch = branch_for(version, source, use_latest)
-    murl   = manifest_url(source)
+    murl   = manifest_url(source, version)
     v      = VERSIONS[version]
+
+    if source == "aosp":
+        print(f"  ⚠ Raw AOSP source selected. This only works cleanly for "
+              f"devices with an OFFICIAL Google AOSP device tree (Pixel-line\n"
+              f"    devices). Community device trees (from LineageOS, "
+              f"TheMuppets, etc.) define '{v.product_prefix}_<codename>'\n"
+              f"    products, NOT 'aosp_<codename>' — lunch will fail with "
+              f"an unknown/invalid combo if you clone one into an AOSP tree.\n"
+              f"    Use --source lineage unless you specifically have an "
+              f"AOSP-native device tree.")
 
     print(f"  manifest : {murl}")
     print(f"  branch   : {branch}")
@@ -385,31 +411,45 @@ def build_lunch_target(rom_prefix: str, codename: str, variant: str,
     """
     Build the correct lunch target string for any Android version.
 
-    Old format (Android ≤13 / lineage-20 and below):
-        lineage_d2att-userdebug
+    Product prefix depends on the ERA, not just source="lineage"/"aosp":
+      Android 4-6  (CyanogenMod era) → cm_d2att-userdebug
+      Android 7+   (LineageOS era)   → lineage_d2att-userdebug
+      Raw AOSP                        → aosp_<codename>-... (only valid for
+                                         devices with an official Google
+                                         AOSP device tree — see repo_sync's
+                                         warning for community trees)
 
-    New format (Android 14+ / lineage-21+):
-        lineage_d2att-ap4a-userdebug
-                          ^^^^ release code
+    Format also depends on era:
+      Old format (Android ≤13 / lineage-20 and below):
+          lineage_d2att-userdebug
+      New format (Android 14+ / lineage-21+):
+          lineage_d2att-ap4a-userdebug
+                            ^^^^ release code
 
     The release code is determined from config.LUNCH_RELEASE_CODES (for
     LineageOS) or config.AOSP_RELEASE_CODES (for raw AOSP builds) keyed
     by the branch/API level. Using the wrong format causes:
         "Invalid lunch combo: ... must be of the form <product>-<release>-<variant>"
+    Using the wrong PREFIX (e.g. lineage_ for a CyanogenMod-era build)
+    causes "Invalid lunch combo" too, since no such product is defined.
 
     Verified: github.com/itsfragilecode/android (lineage-21, ap2a example)
               groups.google.com/g/android-building/c/z7gYowDYQfk (Android 15)
+              XDA CM guides confirming "lunch cm_<codename>-userdebug"
     """
-    from config import (LUNCH_RELEASE_CODES, AOSP_RELEASE_CODES,
-                         VERSIONS, AOSP_ROLLING_BRANCH)
+    from config import (LUNCH_RELEASE_CODES, AOSP_RELEASE_CODES, VERSIONS)
 
     release_code: str | None = None
     vinfo = VERSIONS.get(version)
 
     if source == "lineage" and vinfo:
-        branch = vinfo.lineage_branch
-        release_code = LUNCH_RELEASE_CODES.get(branch)
+        # rom_prefix is derived here, not trusted from the caller — the
+        # caller previously always passed "lineage" even for CM-era builds,
+        # producing lineage_<codename> targets that don't exist pre-Android-7.
+        rom_prefix = vinfo.product_prefix   # "cm" or "lineage"
+        release_code = LUNCH_RELEASE_CODES.get(vinfo.lineage_branch)
     elif source == "aosp" and vinfo:
+        rom_prefix = "aosp"
         release_code = AOSP_RELEASE_CODES.get(vinfo.api)
 
     product = f"{rom_prefix}_{codename}"
