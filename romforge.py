@@ -113,6 +113,26 @@ def _run_build(cfg: dict) -> None:
     for url in (cfg.get("tweaks") or []):
         clone_tree(workdir, "vendor", url, dry_run=dry_run)
 
+    # ── Step 2b: Gerrit patches (specific LineageOS changes onto this tree) ──
+    gerrit_patches = cfg.get("gerrit_patch") or []
+    if gerrit_patches:
+        already = set(state.get("gerrit_patches_applied", []))
+        pending = [c for c in gerrit_patches if c not in already or cfg.get("rebuild")]
+        if pending:
+            print(f"\n  [2b/5] Gerrit patches ({len(pending)} pending)")
+            from build_pipeline import apply_gerrit_patches
+            ok = apply_gerrit_patches(workdir, pending, dry_run=dry_run)
+            if not dry_run:
+                state.setdefault("gerrit_patches_applied", [])
+                state["gerrit_patches_applied"] = list(set(state["gerrit_patches_applied"]) | set(pending))
+                save_state(workdir, state)
+            if not ok:
+                print("    Some patches failed to apply — see above. "
+                      "Resolve conflicts manually, or drop the failing "
+                      "change ID and continue without it.")
+        else:
+            print(f"\n  [2b/5] Gerrit patches — SKIPPED (already applied)")
+
     # ── Step 3: customizations ───────────────────────────────────────────────
     print("\n  [3/5] customizations")
 
@@ -242,6 +262,13 @@ def build_cli_parser() -> argparse.ArgumentParser:
     p.add_argument("--kernel-tree-url",  default=None)
     p.add_argument("--recovery",         default=None)
     p.add_argument("--gapps",            action="store_true")
+    p.add_argument("--gerrit-patch",     action="append", dest="gerrit_patch",
+                   default=[], metavar="CHANGE_ID",
+                   help="Cherry-pick a specific LineageOS Gerrit change onto "
+                        "the synced tree (repeatable). Find change numbers at "
+                        "review.lineageos.org. Not a bulk 'apply all Lineage "
+                        "patches' option — there's no such artifact; see "
+                        "the --source aosp warning for why.")
     p.add_argument("--gapps-variant",    default=None,
                    choices=["core","basic","omni","stock","full"])
     p.add_argument("--root",             action="store_true")

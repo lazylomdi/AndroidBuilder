@@ -1,113 +1,216 @@
 # romforge
 
-A Python orchestrator for custom Android ROM builds. Picks an Android version (4-15), finds device trees on GitHub, syncs source via repo, optionally stages GApps/custom APKs/wallpapers, builds via a chosen backend (local machine, Docker, or GitHub Actions), and optionally patches the output boot image with Magisk for root. Has both a CLI (explicit flags, scriptable) and an interactive TUI (arrow-key menus via questionary). Same underlying pipeline either way.
+A Python orchestrator for building custom Android ROMs (Android 4–15).
+Handles source sync, device tree discovery, GApps, custom assets, root,
+recovery, and the actual build — with a questionary TUI or plain CLI flags.
 
-**This is a wrapper around existing tools (repo, lunch, mka, Magisk, GitHub's API) - it removes manual toil, not the underlying realities of AOSP builds.** Read the Limitations section before you invest hours into a build.
+## Quick start
+
+```bash
+# Install TUI dependency (nothing else needed for CLI)
+pip install questionary
+
+# Set a GitHub token once — raises API limit from 60 to 5,000 req/hr
+# (create at github.com/settings/tokens — no scopes needed)
+export GITHUB_TOKEN=ghp_...
+# or set it interactively: python3 romforge.py → Settings → Set GitHub token
+
+# Interactive TUI (recommended first run)
+python3 romforge.py
+
+# CLI — dry run to preview all commands before committing disk/time
+python3 romforge.py build \
+  --version 14 --codename angler --vendor google --arch arm64 \
+  --gapps --gapps-variant core --root \
+  --dry-run
+
+# CLI — actual build (takes hours, needs 150GB+ disk)
+python3 romforge.py build \
+  --version 14 --codename angler --vendor google \
+  --gapps --gapps-variant core --root \
+  --background          # runs in tmux, survives terminal close
+```
 
 ## Files
 
-| File | Responsibility |
-|------|----------------|
-| `main.py` | CLI + TUI, orchestrates the full pipeline |
-| `config.py` | Version/branch/GApps/arch data tables (edit this to update mappings) |
-| `device_resolver.py` | GitHub search for device trees; ADB auto-detect |
-| `source_manager.py` | `repo init`/`repo sync` wrapper |
-| `builder.py` | Build backend interface + local backend |
-| `backends_remote.py` | Docker + GitHub Actions backends |
-| `customizer.py` | GApps staging, custom asset staging, Magisk root patch |
-| `romforge.yaml` | Example config shape for extending org/GApps lists |
-| `requirements.txt` | Dependencies (questionary for TUI; everything else is stdlib) |
+| File | Role |
+|---|---|
+| `romforge.py` | Entry point — TUI dispatcher + CLI argument parsing + pipeline runner |
+| `config.py` | All static data: version map, GApps catalog, org lists |
+| `github_client.py` | Authenticated, disk-cached GitHub API client |
+| `device_resolver.py` | GitHub search for device/kernel/recovery trees; ADB detect |
+| `pipeline.py` | Build pipeline steps: host checks, repo sync, tree cloning, background launch |
+| `backends.py` | Local, Docker, GitHub Actions build backends |
+| `customizer.py` | GApps (with working Android.mk), assets, boot animation, root, init.d |
+| `tui.py` | Interactive TUI — collects config, passes to pipeline |
+| `requirements.txt` | Python and system dependencies |
 | `README.md` | This file |
 
-## Quick Start
+## Subcommands
 
-```bash
-pip install questionary   # only needed for the interactive TUI mode
-
-# Interactive mode - arrow-key menus walk you through every choice
-python3 romforge.py
-# (equivalent to: python3 romforge.py tui)
-
-# --- Or use explicit CLI flags ---
-
-# See supported versions + their build viability rating
-python3 romforge.py list-versions
-
-# Search GitHub for device trees by codename (no source synced yet)
-python3 romforge.py find-device --codename angler --vendor google
-
-# If a device is plugged in via USB debugging, read its codename/arch
-python3 romforge.py detect-device
-
-# Dry-run a full pipeline so you can see every command before it runs
-python3 romforge.py build --version 12 --codename angler --vendor google \
-    --backend local --gapps --root --dry-run
-
-# Actually run it (drop --dry-run). This will take hours and ~150GB+ disk.
-python3 romforge.py build --version 12 --codename angler --vendor google \
-    --backend local --gapps --root --apk ./my_custom_app.apk \
-    --wallpaper ./my_wallpaper.png
-
-# With GApps variant, a separately-selected kernel tree, a tweak module
-# search, and legacy init.d support all in one run:
-python3 romforge.py build --version 11 --codename d2att --vendor samsung \
-    --gapps --gapps-variant core --kernel --tweak viper4android --initd \
-    --dry-run
+```
+python3 romforge.py                          # TUI
+python3 romforge.py build       [opts]       # CLI build
+python3 romforge.py find        --codename X # search device trees on GitHub
+python3 romforge.py detect                   # read codename/arch from ADB device
+python3 romforge.py versions                 # list supported Android versions
+python3 romforge.py status      [--workdir]  # show pipeline state for a workdir
+python3 romforge.py clear-cache              # clear GitHub API response cache
 ```
 
-## TUI
+## GitHub token (important)
 
-Running `python3 romforge.py` with no arguments (or `python3 romforge.py tui` explicitly) drops into an arrow-key menu that asks the same questions the CLI flags answer: action, Android version, source (LineageOS/AOSP), device codename (auto-detects a connected device first and offers to use it), architecture, build backend, optional GApps/root, optional custom APK/wallpaper, job count, and dry-run.
+Without a token the GitHub API allows 60 requests/hr per IP. A typical
+device tree search fires 8–10 requests; add kernel + recovery searches and
+you hit the limit within a single session.
 
-It then calls the *exact same* pipeline function the CLI uses. The TUI is just a friendlier way to collect the same parameters, not a separate code path. If questionary isn't installed, TUI mode prints an install hint and exits; the CLI subcommands keep working without it.
+With a token: 5,000 req/hr. Set it once:
 
-## What Each Stage Actually Does
+```bash
+# Option 1: environment variable (best for CI)
+export GITHUB_TOKEN=ghp_...
 
-1. **Version selection** - Looks up the Android version in `config.py`, prints its viability rating (good/fragile/archival-only) so you know what you're getting into before syncing gigabytes of source.
+# Option 2: stored permanently (set once in TUI Settings, or:)
+python3 -c "import github_client; github_client.set_token('ghp_...')"
+# stored at ~/.config/romforge/github_token (chmod 600)
+```
 
-2. **Device tree resolution** - Searches GitHub (configured orgs + general search) for repos matching the codename, and checks whether the codename appears as a whole token in the repo name (e.g. `d2att` in `android_device_samsung_d2att`) rather than just a loose substring. Matches are flagged `[exact]` or `[PARTIAL/substring match]` accordingly. **When multiple exact matches exist, you're prompted to pick one** - in an interactive terminal (CLI or TUI) this is a questionary select menu; the tool never silently grabs the highest-starred result for you. For scripted/non-interactive runs, pass `--auto-select` to take the top-ranked exact match without prompting (review the printed candidate list either way - popularity isn't a correctness guarantee, especially for vendor blob repos containing binaries you can't audit).
+No scopes needed — public repository read access only.
 
-3. **Source sync** - Runs `repo init`/`repo sync` against either a LineageOS or raw AOSP manifest for the chosen version's branch. For AOSP, `--use-latest-aosp` switches to Google's current rolling `android-latest-release` branch (with the `--partial-clone --no-use-superproject` flags their docs now specify) instead of a historical numbered tag - see the verification notes below.
+API responses are also cached to `~/.cache/romforge/api/` for 1 hour
+(search results) / 24 hours (release info), so repeated searches within
+a session are free regardless of token status.
 
-4. **GApps** - Resolves the right package *family* for your version+arch. For the API range NikGapps covers, you pick a **variant** (core/basic/omni/stock/full - see `config.NIKGAPPS_VARIANTS`) rather than just a family name. **Direct binary links are intentionally not hardcoded** - NikGapps ships via a SourceForge file browser with no stable API, so this tool points you at the correct per-version folder and the expected filename pattern, and you confirm/download the exact dated file yourself. Want to cherry-pick individual apps within a variant (e.g. drop GoogleDialer)? Edit `nikgapps.config` after extracting - each line is `PackageName=0/1/2`; see [github.com/nikgapps/config](https://github.com/nikgapps/config).
+## Background mode (`--background`)
 
-5. **Kernel tree** (optional, `--kernel`) - Separate search/selection from the device tree, since a device commonly has multiple competing community kernel forks worth choosing between. Same exact-match + interactive-pick pattern as device trees.
+```bash
+python3 romforge.py build --version 14 --codename angler ... --background
+```
 
-6. **Tweak/mod modules** (optional, `--tweak <query>`, repeatable) - Searches GitHub (configured Magisk module orgs + general search) for a free-text query like `viper4android` or `adaway`, lets you pick from real results, and clones the chosen module(s) into `vendor/tweaks/`. These are flashed as Magisk/KernelSU zips after installing the ROM, not compiled into the system image - read each module's README before flashing, same caution as vendor blob repos.
+Re-launches itself in a `tmux` session named `romforge` (falls back to
+`nohup` if tmux isn't installed). The build survives:
+- Closing the terminal window
+- SSH disconnects
+- Screen lock / sleep
 
-7. **init.d support** (optional, `--initd`) - A **legacy** mechanism, relevant almost entirely to Android 4-9-era CM/early-Lineage builds (modern setups use Magisk modules instead). Creates the conventional `/system/etc/init.d` directory and writes the documented `init.rc` service snippet as a reference file. Does **not** patch a boot image's ramdisk automatically - that patch point is kernel/device-specific enough that guessing wrong can produce an unbootable image, so it's left as a manual, verifiable step (same reasoning as the Magisk root step below).
+Reattach at any time: `tmux attach -t romforge`
+View log file: `tail -f ./romforge-14-angler.log`
+Kill the build: `tmux kill-session -t romforge`
 
-8. **Custom apps/wallpapers** - Copies your files into a vendor overlay path. You still need a matching device tree makefile entry (`PRODUCT_PACKAGES` / `PRODUCT_COPY_FILES`) referencing them - staging the files doesn't auto-wire the build to include them.
+Install tmux: `sudo apt install tmux`
 
-9. **Build** - Runs `lunch` + `mka bacon` via your chosen backend. On the **local** backend, a successful build is automatically followed by locating the output `.zip` under `out/target/product/<codename>/` and printing its full path (with size) as `Flashable ROM: ...` at the end of the run - no need to go hunting through the AOSP output tree yourself. If the build reports success but no zip turns up (signing failed silently, etc.), this is called out explicitly rather than silently saying nothing.
+## Resume / incremental builds
 
-10. **Root** - Patches the output `boot.img` with Magisk. Done as a post-build step (safer, more reliable across versions) rather than an in-tree su addon. The actual headless patch step prints manual instructions rather than guessing `magiskboot` flags blindly per device.
+romforge writes a state file (`.romforge_state.json`) to the workdir after
+each step completes. On re-run, completed steps are skipped automatically:
+
+```
+  ✓  repo sync
+  ✓  device trees (device, vendor)
+  ✗  customizations
+  ✗  build
+```
+
+Force a full rebuild: `--rebuild`
+Check state without building: `python3 romforge.py status --workdir ./romforge-src`
+
+## Pure AOSP vs LineageOS source — and patching AOSP with specific Lineage changes
+
+`--source lineage` syncs LineageOS's own manifest (`github.com/LineageOS/android.git`
+for Android 7+, `github.com/CyanogenMod/android.git` for Android 4–6 — these
+are separate orgs with incompatible branches, handled automatically per
+version). This is the entire OS source tree with Lineage's patches already
+integrated into every repo's history — not a lightweight layer on top of AOSP.
+
+`--source aosp` syncs Google's raw manifest instead. **There is no bulk
+"apply all of LineageOS's patches" operation** — LineageOS's manifest
+already *is* that result, built up repo-by-repo over years. Re-deriving it
+as a patch set onto AOSP would just reinvent what `--source lineage` gives
+you directly.
+
+What IS real: cherry-picking **specific, individually chosen** LineageOS
+Gerrit changes onto whatever tree you synced (AOSP or Lineage) — the same
+mechanism LineageOS's own `repopick` tool uses internally:
+
+```bash
+python3 romforge.py build --version 14 --codename angler --source aosp \
+  --gerrit-patch 65062 --gerrit-patch 70001 \
+  --dry-run
+```
+
+Find change numbers by browsing `review.lineageos.org`. Each patch is
+looked up via Gerrit's REST API, then applied with
+`git fetch <project> <ref> && git cherry-pick FETCH_HEAD`. Patches applied
+onto a **vanilla AOSP** tree may conflict — they were written against
+LineageOS's own diverged history, not against AOSP directly — so this is
+closer to an expert/manual workflow than a guaranteed one-liner. Applied
+patches are recorded in the resume state file, so re-running skips ones
+already applied.
+
+## GApps
+
+For Android 9+ (API 29+) with NikGapps:
+- Pick a variant: `core` / `basic` / `omni` / `stock` / `full`
+- romforge generates a **working** `vendor/romforge_gapps/Android.mk` so the
+  build system actually includes the package
+- Download the zip manually from SourceForge (NikGapps has no stable API):
+  `sourceforge.net/projects/nikgapps/files/Releases/Android-{ver}/`
+- Place it at `vendor/romforge_gapps/NikGapps.zip`
+- Add to your device's `BoardConfig.mk`:
+  `PRODUCT_SOONG_NAMESPACES += vendor/romforge_gapps`
+- Per-app control: edit `nikgapps.config` in the zip (`PackageName=0/1/2`)
+
+For Android 4–8: flash GApps separately after installing the ROM.
+In-tree GApps integration for old versions is fragile and not worth it.
 
 ## Backends
 
-| Backend | Description |
-|---------|-------------|
-| **local** (default) | Runs everything directly on this machine, automatically, start to finish: source sync, device/kernel tree cloning, customization, `lunch`+`mka bacon`, and (unless `--dry-run`) locating the final flashable zip for you. This is the only backend that prints a final `Flashable ROM: <path>` line, since docker/github-actions outputs land in a container filesystem or a GitHub Actions artifact respectively, which you retrieve through those systems instead. |
-| **docker** | Generates a `Dockerfile.romforge` with the build deps and runs the build inside a container with your workdir bind-mounted. Disk/RAM still need to be available to Docker itself. |
-| **github-actions** | Generates `.github/workflows/romforge-build.yml`. Doesn't run anything locally; you commit/push it and trigger it from the Actions tab. **Free runners have ~14GB disk and a 6hr limit** - realistic for small device trees or partial steps, not most full AOSP builds. Use a self-hosted runner for anything serious. |
-| **Cloud VM / QEMU box** | Not a separate backend. SSH into your VM and run the local backend there. A fourth code path would just be these same shell commands with extra indirection. |
+**local** (default) — runs `repo sync`, `lunch`, `mka bacon` directly on
+this machine. Requires Ubuntu 22.04 (or equivalent), 150GB+ free disk,
+16GB+ RAM, the AOSP build deps listed in `requirements.txt`. After a
+successful build, prints the path to the flashable `.zip`.
 
-## Verified Against Source Notes (checked June 2026)
+**docker** — generates `Dockerfile.romforge` with all build deps and runs
+the build in a container with the workdir bind-mounted. Still needs
+150GB+ disk allocated to Docker.
 
-- **AOSP's release model changed in 2026.** Source now publishes twice a year (Q2/Q4) under a trunk-stable model, and Google's documented branch for building/contributing is the rolling `android-latest-release`, not per-version numbered tags. This tool keeps the historical tags available (for reproducing an exact old release) but defaults new AOSP work toward `--use-latest-aosp`. Source: [source.android.com/docs/setup/download](https://source.android.com/docs/setup/download)
+**github-actions** — generates `.github/workflows/romforge-build.yml`.
+Nothing runs locally. Push it, trigger from the Actions tab or
+`gh workflow run romforge-build.yml`. Free runners have ~14GB disk and
+a 6hr limit — use a self-hosted runner for full AOSP builds.
 
-- **LineageOS only officially builds the two most recent major versions at a time.** Branches below 14 in this tool's table are marked `lineage_eol=True` and will print a warning when selected - the branch ref may still exist in git history, but expect no upstream fixes or official builds. Source: [lineageos.org/Changelog-31](https://lineageos.org/Changelog-31), [wiki.lineageos.org/faq](https://wiki.lineageos.org/faq)
+## Build pipeline steps
 
-- Re-verify branch names periodically - they rot. Check [github.com/LineageOS/android/branches](https://github.com/LineageOS/android/branches) for the current pair before relying on an exact tag beyond what's in `config.py`.
+```
+[1/5] repo sync        — repo init + repo sync (auto-retry 3×)
+[2/5] tree cloning     — device, vendor, kernel, recovery trees
+[3/5] customizations   — GApps, custom APKs/wallpapers, boot animation, init.d
+[4/5] build            — lunch + mka bacon
+[5/5] root             — Magisk boot.img patch (manual step — see output)
+```
 
-## Limitations (read this before a long build)
+## Honest limitations
 
-- **Android 4-6 are rated archival-only.** Old versions often don't build on modern Ubuntu/glibc, and most public device trees from this era are dead or abandoned (this was the CyanogenMod era, pre-dating LineageOS). This tool will still attempt the steps, but no script can repair a decade of bitrot - treat it as a research exercise, not "I will flash this on my phone tonight."
+- **Android 4–6**: rated archival. Toolchains from this era don't build on
+  modern Ubuntu without a container running 14.04/16.04. Device trees are
+  largely dead. Expect manual repair regardless.
+- **No device list**: device trees are searched live on GitHub. Coverage
+  depends entirely on what's public and maintained for your specific device.
+- **Device tree quality**: romforge finds and clones a tree; it cannot fix
+  a tree that's out of date, missing blobs, or has broken sepolicy.
+- **Radio firmware**: completely separate from the ROM build. Lives in its
+  own partition, shipped by the carrier/OEM. Flash separately from a stock
+  OTA. Without a matching radio your device has no cellular/GPS/Wi-Fi.
+- **SELinux**: policy mismatches are the most common cause of "boots but
+  some apps crash". Don't set `SELinux=permissive` in production (security
+  regression). Use `adb logcat | grep avc` + `audit2allow` to fix properly.
+- **150GB+ disk is real**: the tool checks and warns, but cannot make the
+  build fit in less space.
 
-- **No hardcoded device list.** Device trees are searched live on GitHub rather than baked in, because a static list would be stale immediately. This means coverage depends entirely on what's public and maintained for your specific device.
+## Verified sources (July 2026)
 
-- **Disk/RAM/time are real.** Expect 150GB+ free disk, 16GB+ RAM, and multi-hour build times for any modern (9+) target. The tool checks and warns but cannot work around insufficient resources.
-
-- **Architecture matters throughout.** GApps package, Magisk variant, and even build viability differ between armv7 and arm64 - pass `--arch` correctly; double check against your device's actual `ro.product.cpu.abi` if unsure (`detect-device` does this for you on a connected device).
-
-- **This tool can't guarantee a successful build for any given device/version combination.** It removes toil (manifest lookup, tree search, boilerplate commands); it cannot remove the risk that a specific device tree is incompatible with a specific branch, or that proprietary blobs are missing/mismatched.
+- AOSP branch model: source.android.com/docs/setup/download
+- LineageOS EOL policy: lineageos.org/Changelog-31, wiki.lineageos.org/faq
+- NikGapps variants: nikgapps.com/build
+- GitHub API rate limits: docs.github.com/en/rest/using-the-rest-api/rate-limits-for-the-rest-api
+- tmux background launch: man tmux (new-session -d -s)

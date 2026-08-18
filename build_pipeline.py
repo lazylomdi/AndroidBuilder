@@ -224,6 +224,7 @@ def load_state(workdir: Path) -> dict:
         "version": "1",
         "repo_synced": False,
         "trees_cloned": [],
+        "gerrit_patches_applied": [],
         "customizations_done": [],
         "build_complete": False,
         "output_zips": [],
@@ -326,7 +327,16 @@ def repo_sync(workdir: Path, version: str, source: str,
               f"    products, NOT 'aosp_<codename>' — lunch will fail with "
               f"an unknown/invalid combo if you clone one into an AOSP tree.\n"
               f"    Use --source lineage unless you specifically have an "
-              f"AOSP-native device tree.")
+              f"AOSP-native device tree.\n"
+              f"    Want specific LineageOS features on top of pure AOSP? "
+              f"There's no bulk 'apply all Lineage patches' operation —\n"
+              f"    that's what the lineage manifest already is. But you can "
+              f"cherry-pick INDIVIDUAL LineageOS Gerrit changes with:\n"
+              f"      --gerrit-patch <change-number>   (repeatable)\n"
+              f"    Find change numbers at review.lineageos.org. Patches "
+              f"written against Lineage's own history may conflict when\n"
+              f"    applied to vanilla AOSP — this is expected and the tool "
+              f"will tell you exactly where if it happens.")
 
     print(f"  manifest : {murl}")
     print(f"  branch   : {branch}")
@@ -513,6 +523,124 @@ def clone_tree(workdir: Path, kind: str, clone_url: str,
     except subprocess.CalledProcessError:
         print(f"  Failed to clone {kind} tree from {clone_url}")
         return False
+
+
+# ── Gerrit patch picking (AOSP + specific LineageOS patches) ───────────────────
+#
+# "Sync pure AOSP, then layer on LineageOS's patches" is not a bulk,
+# automatable operation — LineageOS's manifest (github.com/LineageOS/android)
+# already IS that result, built up repo-by-repo over years. There's no
+# smaller "just the patches" artifact to apply in one shot.
+#
+# What IS real and scriptable: cherry-picking SPECIFIC, individually chosen
+# LineageOS Gerrit changes onto whatever tree you have synced. This is
+# exactly what LineageOS's own `repopick` tool does:
+#   git fetch https://review.lineageos.org/<project> <ref>
+#   git cherry-pick FETCH_HEAD
+# Verified: wiki entry "How to use Gerrit" (LineageOS Wiki), which documents
+# this exact fetch+cherry-pick pattern for applying a single change.
+#
+# Applying a Lineage-authored patch onto a VANILLA AOSP tree is a gamble —
+# the patch was written against Lineage's own diverged history at some
+# point in time, not against AOSP directly, so conflicts are common. This
+# is much more likely to apply cleanly onto a tree already synced from
+# LineageOS's own manifest. The tool says this plainly rather than
+# pretending it's reliable either way.
+
+GERRIT_URL = "https://review.lineageos.org"
+
+
+def _gerrit_change_info(change_id: str) -> dict | None:
+    """
+    Query LineageOS's Gerrit REST API for a change's project and current
+    patchset ref. Gerrit prefixes JSON responses with )]}' to prevent
+    XSSI attacks — that prefix must be stripped before parsing.
+    """
+    import urllib.request, json
+    url = f"{GERRIT_URL}/changes/{change_id}/detail?o=CURRENT_REVISION"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            raw = resp.read().decode()
+        raw = raw.lstrip(")]}'\n")
+        data = json.loads(raw)
+        project = data["project"]
+        current_rev = data["current_revision"]
+        ref = data["revisions"][current_rev]["ref"]
+        subject = data.get("subject", "")
+        return {"project": project, "ref": ref, "subject": subject}
+    except Exception as e:
+        print(f"  Failed to look up Gerrit change {change_id}: {e}")
+        return None
+
+
+def _project_to_path(project: str) -> str:
+    """
+    Convert a LineageOS Gerrit project name to its path in the source tree.
+      LineageOS/android_frameworks_base          → frameworks/base
+      LineageOS/android_packages_apps_Settings   → packages/apps/Settings
+    Best-effort convention match — a small number of repos have legitimate
+    underscores inside a path segment and may need a manual override via
+    --gerrit-patch-path.
+    """
+    name = project.split("/")[-1]
+    if name.startswith("android_"):
+        name = name[len("android_"):]
+    return name.replace("_", "/")
+
+
+def apply_gerrit_patches(workdir: Path, change_ids: list[str],
+                          dry_run: bool = False) -> bool:
+    """
+    Cherry-pick specific LineageOS Gerrit changes (by change number, e.g.
+    the "65062" in review.lineageos.org/c/.../+/65062) onto an already-
+    synced tree. Returns True only if every requested change applied.
+    """
+    if not change_ids:
+        return True
+    all_ok = True
+    for change_id in change_ids:
+        print(f"  Looking up Gerrit change {change_id}...")
+        info = _gerrit_change_info(change_id)
+        if not info:
+            all_ok = False
+            continue
+
+        path = _project_to_path(info["project"])
+        dest = workdir / path
+        fetch_url = f"{GERRIT_URL}/{info['project']}"
+        print(f"  Change {change_id}: \"{info['subject']}\" → {path}")
+
+        if dry_run:
+            print(f"    [dry-run] git fetch {fetch_url} {info['ref']}")
+            print(f"    [dry-run] git cherry-pick FETCH_HEAD")
+            continue
+
+        if not dest.exists():
+            print(f"    ⚠ {dest} not found in synced tree — skipping.")
+            print(f"      Project '{info['project']}' maps to path '{path}', "
+                  f"but that directory isn't in this source tree (it may "
+                  f"not be part of the manifest you synced, or the "
+                  f"project-name→path convention didn't match here).")
+            all_ok = False
+            continue
+
+        try:
+            subprocess.run(["git", "fetch", fetch_url, info["ref"]],
+                           cwd=dest, check=True)
+            subprocess.run(["git", "cherry-pick", "FETCH_HEAD"],
+                           cwd=dest, check=True)
+            print(f"    ✓ Applied")
+        except subprocess.CalledProcessError:
+            print(f"    ✗ Cherry-pick failed — most likely a merge conflict.")
+            print(f"      This patch was written against LineageOS's own "
+                  f"history; applying it onto a differently-diverged tree "
+                  f"(e.g. vanilla AOSP) commonly conflicts.")
+            print(f"      Resolve manually: cd {dest} && fix conflicts && "
+                  f"git cherry-pick --continue")
+            print(f"      Or abandon it: cd {dest} && git cherry-pick --abort")
+            all_ok = False
+    return all_ok
 
 
 # ── Background launch ──────────────────────────────────────────────────────────
