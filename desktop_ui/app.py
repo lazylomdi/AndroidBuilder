@@ -62,7 +62,22 @@ class DesktopWindow(QMainWindow):
         self.nav.setCurrentRow(0)
         self.nav.currentRowChanged.connect(self.change_page)
         side.addWidget(self.nav, 1)
-        side_note = QLabel("Python engine\nWindows 10 · Ubuntu")
+        device_status = QFrame()
+        device_status.setObjectName("sidebarDevice")
+        device_status_layout = QVBoxLayout(device_status)
+        device_status_layout.setContentsMargins(10, 10, 10, 10)
+        device_heading = QLabel("CONNECTED DEVICE")
+        device_heading.setObjectName("eyebrow")
+        self.sidebar_device_name = QLabel("No device detected")
+        self.sidebar_device_name.setObjectName("sidebarDeviceName")
+        self.sidebar_device_info = QLabel("ADB · waiting for scan")
+        self.sidebar_device_info.setObjectName("muted")
+        self.sidebar_device_info.setWordWrap(True)
+        device_status_layout.addWidget(device_heading)
+        device_status_layout.addWidget(self.sidebar_device_name)
+        device_status_layout.addWidget(self.sidebar_device_info)
+        side.addWidget(device_status)
+        side_note = QLabel("Python engine · Windows 10 / Ubuntu")
         side_note.setObjectName("muted")
         side.addWidget(side_note)
         layout.addWidget(sidebar)
@@ -374,6 +389,15 @@ class DesktopWindow(QMainWindow):
                 found += 1
         if not found:
             self.device_list.addItem("No devices detected")
+            self.sidebar_device_name.setText("No device detected")
+            self.sidebar_device_info.setText("Connect by USB or wireless ADB")
+        else:
+            first_device = next((line.strip() for line in lines if line.strip()), "")
+            parts = first_device.split()
+            serial = parts[0] if parts else "Device detected"
+            state = parts[1] if len(parts) > 1 else "unknown"
+            self.sidebar_device_name.setText(serial)
+            self.sidebar_device_info.setText(f"ADB status: {state}")
         if result.stderr.strip():
             self.device_output.appendPlainText(result.stderr.strip())
 
@@ -443,35 +467,43 @@ class DesktopWindow(QMainWindow):
                 self.process.terminate()
 
     def apply_styles(self) -> None:
+        # Inspired by the user's Android Toolkit reference: compact dark workspace,
+        # strong sidebar navigation, quiet borders, and clear action emphasis.
         self.setStyleSheet("""
-            QWidget { background: #f5f7fb; color: #182230; font-size: 13px; }
-            #sidebar { background: #ffffff; border-right: 1px solid #e1e6ef; }
-            #brand { font-size: 20px; font-weight: 700; padding: 14px 8px 4px; color: #172b4d; }
-            #eyebrow { color: #7b8798; font-size: 10px; font-weight: 700; letter-spacing: 1px; padding: 0 8px 10px; }
-            #muted { color: #66758a; }
-            #pageTitle { font-size: 27px; font-weight: 700; color: #16253d; }
+            QWidget { background: #101012; color: #e8e8ec; font-size: 12px; }
+            QMainWindow { background: #101012; }
+            #sidebar { background: #171719; border-right: 1px solid #29292d; }
+            #brand { font-size: 18px; font-weight: 700; padding: 14px 8px 4px; color: #f5f5f7; }
+            #eyebrow { color: #777780; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 0 4px 8px; }
+            #muted { color: #9999a2; }
+            #pageTitle { font-size: 25px; font-weight: 700; color: #f1f1f4; }
             QListWidget { background: transparent; border: 0; outline: 0; padding: 8px 4px; }
-            QListWidget::item { padding: 13px 12px; border-radius: 8px; margin: 2px 0; color: #4a5a70; }
-            QListWidget::item:selected { background: #e8efff; color: #2458c6; font-weight: 600; }
-            #card, QGroupBox { background: white; border: 1px solid #e2e8f0; border-radius: 12px; }
+            QListWidget::item { padding: 13px 12px; border-radius: 5px; margin: 2px 0; color: #a6a6af; }
+            QListWidget::item:selected { background: #29292e; color: #ffffff; border-left: 2px solid #a855f7; font-weight: 600; }
+            #card, QGroupBox { background: #1b1b1e; border: 1px solid #2b2b30; border-radius: 8px; }
             #card { padding: 8px; }
-            #cardTitle { color: #75849a; font-size: 11px; font-weight: 700; }
-            #metric { color: #1f3b66; font-size: 19px; font-weight: 700; }
-            #sectionTitle { font-size: 16px; font-weight: 700; }
-            #notice { background: #eef4ff; color: #31517c; border: 1px solid #dce8ff; border-radius: 9px; padding: 12px; }
+            #cardTitle { color: #85858f; font-size: 10px; font-weight: 700; letter-spacing: .5px; }
+            #metric { color: #f0f0f3; font-size: 18px; font-weight: 700; }
+            #sectionTitle { font-size: 15px; font-weight: 700; color: #eeeeF2; }
+            #notice { background: #111d1b; color: #75cfc1; border: 1px solid #203b36; border-radius: 6px; padding: 12px; }
+            #sidebarDevice { background: #131315; border: 1px solid #2a2a2e; border-radius: 6px; }
+            #sidebarDeviceName { color: #ededf0; font-weight: 700; }
             QGroupBox { margin-top: 10px; padding: 16px; font-weight: 600; }
-            QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; }
-            QLineEdit, QComboBox, QSpinBox, QPlainTextEdit { background: white; border: 1px solid #d6deea; border-radius: 7px; padding: 8px; selection-background-color: #c9d9ff; }
+            QGroupBox::title { subcontrol-origin: margin; left: 12px; padding: 0 5px; color: #b5b5bf; }
+            QLineEdit, QComboBox, QSpinBox, QPlainTextEdit { background: #141416; color: #ededf0; border: 1px solid #333339; border-radius: 6px; padding: 8px; selection-background-color: #6336a6; }
+            QComboBox QAbstractItemView { background: #202024; color: #ededf0; selection-background-color: #6336a6; }
+            QCheckBox { spacing: 8px; color: #d6d6dc; }
             QPlainTextEdit { font-family: Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
-            QPushButton { background: white; border: 1px solid #d4dce8; border-radius: 8px; padding: 9px 15px; font-weight: 600; }
-            QPushButton:hover { background: #f0f4fa; }
-            QPushButton#primaryButton { background: #2864dc; color: white; border-color: #2864dc; }
-            QPushButton#primaryButton:hover { background: #1f52ba; }
-            #statusPill { background: #e8efff; color: #2458c6; border-radius: 7px; padding: 9px; font-weight: 600; }
-            QProgressBar { border: 0; background: #e5eaf2; border-radius: 4px; height: 8px; text-align: center; }
-            QProgressBar::chunk { background: #2864dc; border-radius: 4px; }
+            QPushButton { background: #202023; color: #dedee4; border: 1px solid #34343a; border-radius: 6px; padding: 9px 15px; font-weight: 600; }
+            QPushButton:hover { background: #2a2a30; border-color: #4b4b55; }
+            QPushButton#primaryButton { background: #6550a8; color: white; border-color: #8068ce; }
+            QPushButton#primaryButton:hover { background: #7962bf; }
+            #statusPill { background: #142b27; color: #75cfc1; border: 1px solid #244a43; border-radius: 6px; padding: 9px; font-weight: 600; }
+            QProgressBar { border: 0; background: #29292e; border-radius: 4px; height: 8px; text-align: center; }
+            QProgressBar::chunk { background: #58b9a9; border-radius: 4px; }
+            QScrollBar:vertical { background: #151517; width: 10px; margin: 0; }
+            QScrollBar::handle:vertical { background: #3b3b42; min-height: 24px; border-radius: 4px; }
         """)
-
 
 def main() -> int:
     app = QApplication(sys.argv)
