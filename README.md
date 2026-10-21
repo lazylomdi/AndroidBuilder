@@ -21,6 +21,25 @@ python romforge.py ut-check --inspect-device --serial YOUR_ADB_SERIAL
 
 Device inspection is opt-in and read-only: it runs `adb devices -l`, `getprop`, reads `/proc/meminfo`, and queries `uname -r`. It does not root, unlock, flash, or change phone settings. Add `--online` to search GitHub for candidate repositories; network failures are reported and repository metadata is never treated as compatibility proof. User-provided facts are marked as candidates, unknown properties remain unknown, and no report claims that a port builds or boots. See [device readiness](docs/device-readiness.md), [porting notes](docs/ubuntu-touch-porting.md), and the [repository audit](docs/repository-audit.md).
 
+## Windows 10 setup automation
+
+From PowerShell in the repository folder, run the prerequisite checks:
+
+```powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\setup_windows.ps1
+```
+
+Optional switches can attempt to install Git/Python/ADB with WinGet, request WSL2 Ubuntu installation, or install Python requirements and run project checks:
+
+```powershell
+.\setup_windows.ps1 -InstallTools
+.\setup_windows.ps1 -InstallWSL
+.\setup_windows.ps1 -InstallPythonDependencies
+```
+
+Review [Windows setup instructions](docs/windows-setup.md) before using installation switches. WSL2 Ubuntu is recommended for actual Android ROM builds; the script does not restart the PC and does not modify or flash the phone.
+
 ## Existing ROM builder
 
 Run `python3 romforge.py --help` for CLI usage. The interactive menu requires `questionary`; see `requirements.txt` for dependencies and external build tools.
