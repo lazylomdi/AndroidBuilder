@@ -35,7 +35,7 @@ The recursive Git tree has no `tests/`, `docs/`, `.github/workflows/`, `.gitigno
 
 ## Readiness checker status
 
-No `ut-check` dispatch or dedicated readiness module/profile/tests were present in the recursive tree at the audited baseline. This implementation adds a small, offline-first checker. It labels user input `CANDIDATE`, missing data `UNKNOWN`, and does not infer compatibility from RAM or repository presence.
+No `ut-check` dispatch or dedicated readiness module/profile/tests were present in the recursive tree at the audited baseline. This implementation adds a small, offline-first checker and an optional read-only GitHub repository search. It labels user input `CANDIDATE`, missing data `UNKNOWN`, and search results `CANDIDATE`; it does not infer compatibility from RAM or repository presence. Official UBports/Halium metadata matching and device-specific source validation remain incomplete.
 
 ## Relevant upstream documentation
 
@@ -49,5 +49,5 @@ No `ut-check` dispatch or dedicated readiness module/profile/tests were present 
 1. Add an offline deterministic readiness assessment, JSON/Markdown reporting, conservative statuses, and unit tests.
 2. Add the Sony Xperia R1 research profile with unverified properties explicitly unknown.
 3. Wire `ut-check` into the existing `romforge.py` dispatcher without changing ROM build paths.
-4. Expand public-source discovery behind an explicit online option with timeouts and error reporting.
-5. Add broader CI and security tests after confirming project Python support and existing entry-point behavior.
+4. Expand source discovery to official UBports/Halium metadata and device-specific source validation.
+5. Add CI and broader security tests after confirming project Python support and existing entry-point behavior.
