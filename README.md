@@ -21,6 +21,17 @@ python romforge.py ut-check --inspect-device --serial YOUR_ADB_SERIAL
 
 Device inspection is opt-in and read-only: it runs `adb devices -l`, `getprop`, reads `/proc/meminfo`, and queries `uname -r`. It does not root, unlock, flash, or change phone settings. Add `--online` to search GitHub for candidate repositories; network failures are reported and repository metadata is never treated as compatibility proof. User-provided facts are marked as candidates, unknown properties remain unknown, and no report claims that a port builds or boots. See [device readiness](docs/device-readiness.md), [porting notes](docs/ubuntu-touch-porting.md), and the [repository audit](docs/repository-audit.md).
 
+## Desktop UI (Windows 10 and Ubuntu)
+
+An optional PySide6 desktop app provides a dashboard, build wizard, live process logs, and read-only ADB device manager.
+
+```bash
+python3 -m pip install -r requirements-ui.txt
+python3 run_desktop_ui.py
+```
+
+On Windows PowerShell, use `py -3 -m pip install -r requirements-ui.txt` and `python run_desktop_ui.py`. See [desktop UI instructions](docs/desktop-ui.md). The GUI defaults to dry-run and invokes the existing Python CLI; full ROM builds should run in Ubuntu/WSL2.
+
 ## Ubuntu setup
 
 For a native Ubuntu host, run the checks-only helper from the repository root:
