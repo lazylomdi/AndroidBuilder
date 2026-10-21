@@ -126,9 +126,11 @@ def main(argv: list[str] | None = None) -> int:
     bootloader_unlock = None if args.bootloader_unlock == "unknown" else args.bootloader_unlock
     if live and live.get("status") == "OK":
         detected = live["device"]
-        manufacturer = detected.get("manufacturer") or manufacturer
-        model = detected.get("model") or model
-        ram_gb = detected.get("ram_gb") or ram_gb
+        # In live-inspection mode, absent device properties stay unknown rather
+        # than inheriting the offline Sony Xperia R1 defaults.
+        manufacturer = detected.get("manufacturer")
+        model = detected.get("model")
+        ram_gb = detected.get("ram_gb")
         codename = detected.get("codename") or codename
         android_version = detected.get("android_version") or android_version
         kernel_version = detected.get("kernel_version") or kernel_version
