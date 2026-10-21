@@ -10,6 +10,7 @@ Usage:
   python3 romforge.py versions      # list Android versions
   python3 romforge.py status [--workdir <dir>]  # show pipeline state for a workdir
   python3 romforge.py clear-cache   # clear GitHub API response cache
+  python3 romforge.py ut-check [opts] # assess Ubuntu Touch port readiness (offline)
 
 Run `python3 romforge.py build --help` for all CLI build flags.
 """
@@ -466,6 +467,10 @@ def main() -> None:
             print(f"\n  Generated {len(files)} file(s) in {workdir / 'treble_port'}/")
             print(f"  Read PORTING_README.txt before merging anything into your device tree.")
 
+    elif sub == "ut-check":
+        import ut_check
+        raise SystemExit(ut_check.main(sys.argv[2:]))
+
     elif sub == "clear-cache":
         import github_client
         n = github_client.clear_cache()
@@ -473,7 +478,7 @@ def main() -> None:
 
     else:
         print(f"Unknown subcommand '{sub}'. Run without args for TUI, or --help.")
-        print("Subcommands: build, port, find, detect, versions, status, clear-cache")
+        print("Subcommands: build, port, find, detect, versions, status, clear-cache, ut-check")
         sys.exit(1)
 
 
