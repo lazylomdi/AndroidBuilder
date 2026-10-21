@@ -110,7 +110,7 @@ if ($InstallPythonDependencies) {
 }
 
 Write-Section "Project self-check"
-if (Test-Command "python" -and (Test-Path (Join-Path $PSScriptRoot "romforge.py"))) {
+if ((Test-Command "python") -and (Test-Path (Join-Path $PSScriptRoot "romforge.py"))) {
     Push-Location $PSScriptRoot
     try {
         & python romforge.py ut-check --help
