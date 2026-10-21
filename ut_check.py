@@ -7,6 +7,7 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
+from source_discovery import discover_github_candidates
 
 STATUSES = {"VERIFIED", "CANDIDATE", "UNKNOWN", "BLOCKED", "NOT_APPLICABLE"}
 
@@ -101,6 +102,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--android-version")
     parser.add_argument("--kernel-version")
     parser.add_argument("--bootloader-unlock", choices=["yes", "no", "unknown"], default="unknown")
+    parser.add_argument("--online", action="store_true", help="Search GitHub for candidate repositories; results are not compatibility proof.")
     parser.add_argument("--json-out", type=Path)
     parser.add_argument("--markdown-out", type=Path)
     return parser
@@ -110,6 +112,12 @@ def main(argv: list[str] | None = None) -> int:
     report = assess_device(args.manufacturer, args.model, args.ram_gb, args.codename,
         args.android_version, args.kernel_version,
         None if args.bootloader_unlock == "unknown" else args.bootloader_unlock)
+    if args.online:
+        query = "{} {} Android kernel device tree".format(args.manufacturer or "", args.model or "").strip()
+        report["source_discovery"] = discover_github_candidates(query)
+    else:
+        report["source_discovery"] = {"status": "NOT_RUN", "candidates": [], "error": None,
+            "note": "Pass --online to search GitHub; no network request was made."}
     json_text = json.dumps(report, indent=2, ensure_ascii=False) + "\n"
     markdown_text = render_markdown(report)
     try:
