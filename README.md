@@ -11,7 +11,15 @@ python3 romforge.py ut-check \
   --markdown-out reports/xperia-r1.md
 ```
 
-The checker does not require a connected phone. Add `--online` to search GitHub for candidate repositories; network failures are reported and repository metadata is never treated as compatibility proof. User-provided facts are marked as candidates, unknown properties remain unknown, and no report claims that a port builds or boots. See [device readiness](docs/device-readiness.md), [porting notes](docs/ubuntu-touch-porting.md), and the [repository audit](docs/repository-audit.md).
+The checker does not require a connected phone. On Windows 10, install Android SDK Platform-Tools, add its folder to `PATH`, enable USB debugging on the phone, connect by USB, and accept the authorization prompt. Then run:
+
+```powershell
+python romforge.py ut-check --inspect-device
+# If more than one phone is connected:
+python romforge.py ut-check --inspect-device --serial YOUR_ADB_SERIAL
+```
+
+Device inspection is opt-in and read-only: it runs `adb devices -l`, `getprop`, reads `/proc/meminfo`, and queries `uname -r`. It does not root, unlock, flash, or change phone settings. Add `--online` to search GitHub for candidate repositories; network failures are reported and repository metadata is never treated as compatibility proof. User-provided facts are marked as candidates, unknown properties remain unknown, and no report claims that a port builds or boots. See [device readiness](docs/device-readiness.md), [porting notes](docs/ubuntu-touch-porting.md), and the [repository audit](docs/repository-audit.md).
 
 ## Existing ROM builder
 
