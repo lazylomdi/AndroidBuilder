@@ -9,6 +9,6 @@ python3 romforge.py ut-check \
   --markdown-out reports/xperia-r1.md
 ```
 
-Optional inputs include `--codename`, `--android-version`, `--kernel-version`, and `--bootloader-unlock yes|no|unknown`. Omitted values remain unknown. Reports are preliminary evidence inventories, not compatibility certifications. A candidate source repository is not proof of a successful build; a successful build is not proof of bootability or working radio, graphics, Wi-Fi, camera, audio, sensors, or power management.
+Add `--online` to search GitHub's repository API for candidate sources. This is optional; the default makes no network request. Results are unverified candidates, not proof of device compatibility. Optional inputs include `--codename`, `--android-version`, `--kernel-version`, and `--bootloader-unlock yes|no|unknown`. Omitted values remain unknown. Reports are preliminary evidence inventories, not compatibility certifications. A candidate source repository is not proof of a successful build; a successful build is not proof of bootability or working radio, graphics, Wi-Fi, camera, audio, sensors, or power management.
 
 Statuses are `VERIFIED`, `CANDIDATE`, `UNKNOWN`, `BLOCKED`, and `NOT_APPLICABLE`. This initial checker uses `CANDIDATE` for user-provided data and `UNKNOWN` for facts without independent evidence. It does not yet mark device-specific facts `VERIFIED`.
