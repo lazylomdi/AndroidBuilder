@@ -71,7 +71,13 @@ def render_markdown(report: dict[str, Any]) -> str:
         f"- **RAM (reported):** {device.get('ram_gb') if device.get('ram_gb') is not None else 'Unknown'} GB",
         f"- **Physical device available:** {report['physical_device_available']}",
         f"- **Conclusion:** {report['readiness_claim']}", "",
-        "## Findings", "", "| Area | Value | Status | Evidence |", "|---|---|---|---|"]
+        "## Device inspection", ""]
+    inspection = report.get("device_inspection", {})
+    lines.append(f"- **Inspection status:** {inspection.get('status', 'NOT_RUN')}")
+    lines.append(f"- **Message:** {inspection.get('message', 'No live inspection data.')}")
+    if inspection.get("serial"):
+        lines.append(f"- **ADB serial:** {inspection['serial']}")
+    lines.extend(["", "## Findings", "", "| Area | Value | Status | Evidence |", "|---|---|---|---|"])
     def safe(value: Any) -> str:
         return str(value).replace("|", "\\|").replace("\n", " ")
     for item in report["findings"]:
