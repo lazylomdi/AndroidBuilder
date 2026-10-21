@@ -21,6 +21,25 @@ python romforge.py ut-check --inspect-device --serial YOUR_ADB_SERIAL
 
 Device inspection is opt-in and read-only: it runs `adb devices -l`, `getprop`, reads `/proc/meminfo`, and queries `uname -r`. It does not root, unlock, flash, or change phone settings. Add `--online` to search GitHub for candidate repositories; network failures are reported and repository metadata is never treated as compatibility proof. User-provided facts are marked as candidates, unknown properties remain unknown, and no report claims that a port builds or boots. See [device readiness](docs/device-readiness.md), [porting notes](docs/ubuntu-touch-porting.md), and the [repository audit](docs/repository-audit.md).
 
+## Ubuntu setup
+
+For a native Ubuntu host, run the checks-only helper from the repository root:
+
+```bash
+chmod +x setup_ubuntu.sh
+./setup_ubuntu.sh
+```
+
+Optional install steps are explicit:
+
+```bash
+./setup_ubuntu.sh --install-tools
+./setup_ubuntu.sh --install-build-deps
+./setup_ubuntu.sh --install-python-deps
+```
+
+See [Ubuntu setup instructions](docs/ubuntu-setup.md) for package notes, virtual-environment use, ADB device inspection, and limitations. The helper does not sync ROM sources or modify a connected phone.
+
 ## Windows 10 setup automation
 
 From PowerShell in the repository folder, run the prerequisite checks:
