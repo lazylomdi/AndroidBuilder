@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 from source_discovery import discover_github_candidates
+from device_inspector import inspect_device
 
 STATUSES = {"VERIFIED", "CANDIDATE", "UNKNOWN", "BLOCKED", "NOT_APPLICABLE"}
 
@@ -102,6 +103,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--android-version")
     parser.add_argument("--kernel-version")
     parser.add_argument("--bootloader-unlock", choices=["yes", "no", "unknown"], default="unknown")
+    parser.add_argument("--inspect-device", action="store_true", help="Read device properties through ADB (read-only; requires USB debugging).")
+    parser.add_argument("--serial", help="ADB serial to inspect when multiple devices are connected; requires --inspect-device.")
     parser.add_argument("--online", action="store_true", help="Search GitHub for candidate repositories; results are not compatibility proof.")
     parser.add_argument("--json-out", type=Path)
     parser.add_argument("--markdown-out", type=Path)
@@ -109,9 +112,30 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    report = assess_device(args.manufacturer, args.model, args.ram_gb, args.codename,
-        args.android_version, args.kernel_version,
-        None if args.bootloader_unlock == "unknown" else args.bootloader_unlock)
+    if args.serial and not args.inspect_device:
+        build_parser().error("--serial requires --inspect-device")
+    live = inspect_device(args.serial) if args.inspect_device else None
+    manufacturer, model, ram_gb = args.manufacturer, args.model, args.ram_gb
+    codename, android_version, kernel_version = args.codename, args.android_version, args.kernel_version
+    bootloader_unlock = None if args.bootloader_unlock == "unknown" else args.bootloader_unlock
+    if live and live.get("status") == "OK":
+        detected = live["device"]
+        manufacturer = detected.get("manufacturer") or manufacturer
+        model = detected.get("model") or model
+        ram_gb = detected.get("ram_gb") or ram_gb
+        codename = detected.get("codename") or codename
+        android_version = detected.get("android_version") or android_version
+        kernel_version = detected.get("kernel_version") or kernel_version
+        bootloader_unlock = detected.get("bootloader_unlock") or bootloader_unlock
+    report = assess_device(manufacturer, model, ram_gb, codename,
+        android_version, kernel_version, bootloader_unlock)
+    report["physical_device_available"] = bool(live and live.get("status") == "OK")
+    report["device_inspection"] = live or {"status": "NOT_RUN", "message": "Pass --inspect-device to query a connected phone.", "serial": None, "device": {}, "devices": []}
+    if live and live.get("status") != "OK":
+        report["limitations"].append("Live device inspection was requested but did not succeed: " + live.get("message", "unknown error"))
+    elif live and live.get("status") == "OK":
+        report["limitations"] = [x for x in report["limitations"] if x != "No device was connected, flashed, or physically tested."]
+        report["limitations"].append("A device was connected for read-only property inspection; it was not flashed or functionally tested.")
     if args.online:
         query = "{} {} Android kernel device tree".format(args.manufacturer or "", args.model or "").strip()
         report["source_discovery"] = discover_github_candidates(query)
