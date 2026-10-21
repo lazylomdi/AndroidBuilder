@@ -63,8 +63,8 @@ class DeviceInspectorTests(unittest.TestCase):
         self.assertEqual(result["device"]["kernel_version"], "5.10.1")
         self.assertEqual(result["device"]["ram_gb"], 2.0)
         self.assertIsNone(result["device"]["bootloader_unlock"])
-        self.assertTrue(all("flash" in item or "No device" in item or "source" in item or "ADB properties" in item
-                            for item in result["limitations"]))
+        self.assertIn("No device files or settings were changed.", result["limitations"])
+        self.assertIn("Bootloader unlock eligibility/status is not inferred from these properties.", result["limitations"])
 
 
 if __name__ == "__main__":
