@@ -381,38 +381,62 @@ class DesktopWindow(QMainWindow):
         adb = shutil.which("adb")
         if not adb:
             self.device_list.addItem("ADB not found on PATH")
+            self.sidebar_device_name.setText("ADB unavailable")
+            self.sidebar_device_info.setText("Install Android platform tools, then refresh.")
+            self.device_output.setPlainText("ADB was not found on PATH. Install platform-tools and click Refresh devices.")
             return
-        result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False)
-        lines = result.stdout.splitlines()[1:]
-        found = 0
-        for line in lines:
-            line = line.strip()
-            if line:
-                self.device_list.addItem(line)
-                found += 1
-        if not found:
+        try:
+            result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            self.device_list.addItem("Could not query ADB")
+            self.sidebar_device_name.setText("ADB error")
+            self.sidebar_device_info.setText(str(exc))
+            self.device_output.setPlainText(f"Could not query ADB devices:\n{exc}")
+            return
+        device_items = []
+        for raw in result.stdout.splitlines()[1:]:
+            line = raw.strip()
+            if not line:
+                continue
+            parts = line.split()
+            serial = parts[0]
+            state = parts[1] if len(parts) > 1 else "unknown"
+            self.device_list.addItem(line)
+            item = self.device_list.item(self.device_list.count() - 1)
+            item.setData(Qt.ItemDataRole.UserRole, serial)
+            item.setData(Qt.ItemDataRole.UserRole + 1, state)
+            device_items.append(item)
+        if not device_items:
             self.device_list.addItem("No devices detected")
             self.sidebar_device_name.setText("No device detected")
-            self.sidebar_device_info.setText("Connect by USB or wireless ADB")
+            self.sidebar_device_info.setText("Check USB debugging, cable, and authorization.")
+            self.device_output.setPlainText("No ADB devices found. Keep the phone unlocked and run adb devices -l in a terminal.")
         else:
-            first_device = next((line.strip() for line in lines if line.strip()), "")
-            parts = first_device.split()
-            serial = parts[0] if parts else "Device detected"
-            state = parts[1] if len(parts) > 1 else "unknown"
+            selected = next((item for item in device_items if item.data(Qt.ItemDataRole.UserRole + 1) == "device"), device_items[0])
+            self.device_list.setCurrentItem(selected)
+            serial = selected.data(Qt.ItemDataRole.UserRole)
+            state = selected.data(Qt.ItemDataRole.UserRole + 1)
             self.sidebar_device_name.setText(serial)
-            self.sidebar_device_info.setText(f"ADB status: {state}")
+            self.sidebar_device_info.setText(f"ADB status: {state} · {len(device_items)} device(s) detected")
+            if state == "device":
+                self.device_output.setPlainText(f"Connected: {serial}\nDevice selected automatically. Click Inspect selected device for read-only inspection.")
+            else:
+                self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
         if result.stderr.strip():
-            self.device_output.appendPlainText(result.stderr.strip())
+            self.device_output.appendPlainText("\nADB stderr:\n" + result.stderr.strip())
 
     def inspect_device(self) -> None:
         item = self.device_list.currentItem()
         if not item:
-            QMessageBox.information(self, "Select a device", "Refresh the device list and select a device row first.")
+            QMessageBox.information(self, "Select a device", "Click Refresh devices first.")
             return
-        line = item.text()
-        serial = line.split()[0] if line and not line.startswith(("ADB not found", "No devices")) else ""
-        if not serial or serial in {"List", "of"}:
-            QMessageBox.warning(self, "No device selected", "Select a connected device row, not a status message.")
+        serial = item.data(Qt.ItemDataRole.UserRole)
+        state = item.data(Qt.ItemDataRole.UserRole + 1)
+        if not serial or state is None:
+            QMessageBox.warning(self, "No connected device", "Select a valid device row, not a status message.")
+            return
+        if state != "device":
+            QMessageBox.warning(self, "Device not ready", f"ADB reports state {state!r}. Unlock the phone and authorize USB debugging, then refresh.")
             return
         answer = QMessageBox.question(
             self, "Read-only inspection",
