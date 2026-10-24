@@ -21,7 +21,8 @@ The UI must explain technical terms in plain language, make safe choices by defa
 ### Scope
 
 - Add a beginner-oriented landing page with a primary **Check my phone** action and secondary paths for build/install tasks.
-- Turn device inspection into a guided wizard: connect phone → authorize USB debugging → identify device → run read-only checks → explain results.
+- Turn device inspection into a guided wizard: connect phone(s) → authorize USB debugging → identify each device → explicitly select one device → run read-only checks → explain results.
+- Make multi-device use a first-class scenario: list every ADB device with model/name, serial, and state; summarize total/ready/unauthorized counts; update the selected-device summary when selection changes; and ensure inspection targets only the selected serial.
 - Show manufacturer/model, Android version, device codename, CPU architecture, RAM/storage, and device image when a suitable source is found. Image results must include attribution/license/source and a fallback if no image is available.
 - Present a clear compatibility summary using **Supported by evidence**, **Possible but unverified**, **Blocked by a known issue**, and **Not enough information**. Do not use a single score that hides uncertainty.
 - Explain bootloader *current state* separately from OEM *unlock eligibility*. Label ADB properties as device-reported clues; never treat a missing or vendor-specific property as proof.
@@ -33,6 +34,8 @@ The UI must explain technical terms in plain language, make safe choices by defa
 
 - A novice can discover a connected, authorized phone without opening a terminal and can understand each status and its next action.
 - Missing ADB, unauthorized/offline devices, multiple devices, network errors, and unknown device models produce actionable messages.
+- With two or more connected devices, all devices appear independently with their serial and ADB state; changing the selected row updates the selected-device details, and inspection passes only that row's serial to the checker.
+- Unauthorized/offline devices remain visible but cannot be inspected until their state is resolved.
 - Inspection remains read-only; automated tests verify no unlock/flash/erase command is issued by the inspection path.
 - Unknown or conflicting bootloader evidence is displayed as uncertain, not silently converted to locked/unlocked.
 - Tests run on supported Python versions, and the UI receives manual smoke tests on Windows and Linux before the milestone is called complete.
