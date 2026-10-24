@@ -160,6 +160,14 @@ def main(argv: list[str] | None = None) -> int:
                 f"Read-only ADB property {prop_name}; device-reported, not independently verified.",
                 "Use as a compatibility clue; verify against device-specific sources."
             )))
+        boot = detected.get("bootloader_assessment", {})
+        report["findings"].append(asdict(Finding(
+            "bootloader_current_state",
+            boot.get("current_state", "UNKNOWN"),
+            "CANDIDATE" if boot.get("current_state", "UNKNOWN") != "UNKNOWN" else "UNKNOWN",
+            boot.get("evidence", "No reliable bootloader-state indicator was available."),
+            "Treat this as device-reported evidence only. Verify on-device and distinguish current lock state from OEM unlock eligibility."
+        )))
         storage = detected.get("data_storage", {})
         report["findings"].append(asdict(Finding(
             "data_partition_storage",
