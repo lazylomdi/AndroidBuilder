@@ -402,6 +402,23 @@ def main() -> None:
                   f"{'yes' if v.lineage_eol else 'no':<5} {note}")
         print()
 
+    elif sub == "preflight":
+        from preflight import run_preflight
+        ap = argparse.ArgumentParser(prog="romforge preflight",
+            description="Check build prerequisites without installing tools or starting a build.")
+        ap.add_argument("--workdir", default="./romforge-src")
+        ap.add_argument("--backend", default="local",
+                        choices=["local", "docker", "github-actions"])
+        ns = ap.parse_args(sys.argv[2:])
+        report = run_preflight(ns.workdir, ns.backend)
+        print(f"\nBuild preflight: {report['summary']}")
+        print(f"Backend: {report['backend']} · Work directory: {report['workdir']}")
+        for item in report["checks"]:
+            print(f"  [{item['status']}] {item['name']}: {item['detail']}")
+        print("\nThis is a host readiness check, not a device compatibility or bootability guarantee.")
+        if not report["ready"]:
+            sys.exit(2)
+
     elif sub == "status":
         from build_pipeline import load_state, print_state
         ap = argparse.ArgumentParser(prog="romforge status")
