@@ -425,10 +425,10 @@ class DesktopWindow(QMainWindow):
         try:
             report_dir.mkdir(parents=True, exist_ok=True)
         except OSError as exc:
-            QMessageBox.critical(self, "Cannot save report", f"Could not create the report directory:\\n{exc}")
+            QMessageBox.critical(self, "Cannot save report", f"Could not create the report directory:\n{exc}")
             return
         self.device_report_path = report_dir / "device-readiness-report.md"
-        self.device_output.setPlainText(f"Inspecting {serial} with read-only ADB commands...\\nReport: {self.device_report_path}")
+        self.device_output.setPlainText(f"Inspecting {serial} with read-only ADB commands...\nReport: {self.device_report_path}")
         self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(self.device_report_path)], "Device inspection")
 
     def choose_workdir(self) -> None:
@@ -454,6 +454,14 @@ class DesktopWindow(QMainWindow):
         self.build_status.setText("Completed successfully" if code == 0 else f"Finished with exit code {code}")
         self.log.appendPlainText(f"\n[Process exited with code {code}]")
         self.device_output.appendPlainText(f"\n[Process exited with code {code}]")
+        if self.device_report_path is not None and self.device_report_path.is_file():
+            try:
+                report = self.device_report_path.read_text(encoding="utf-8")
+                self.device_output.setPlainText(report)
+            except OSError as exc:
+                self.device_output.appendPlainText(f"\nCould not read readiness report: {exc}")
+        elif code != 0:
+            self.device_output.appendPlainText("\nInspection failed. See Build monitor for the full command output.")
         self.refresh_environment()
         self.refresh_devices()
 
