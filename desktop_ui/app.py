@@ -40,6 +40,7 @@ class DesktopWindow(QMainWindow):
         self.process.finished.connect(self.process_finished)
         self.process.errorOccurred.connect(self.process_error)
         self.build_running = False
+        self.device_report_path: Path | None = None
 
         root = QWidget()
         layout = QHBoxLayout(root)
@@ -420,8 +421,15 @@ class DesktopWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.device_output.clear()
-        self.nav.setCurrentRow(2)
-        self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(ROOT / "device-readiness-report.md")], "Device inspection")
+        report_dir = Path.home() / ".local" / "share" / "AndroidBuilder"
+        try:
+            report_dir.mkdir(parents=True, exist_ok=True)
+        except OSError as exc:
+            QMessageBox.critical(self, "Cannot save report", f"Could not create the report directory:\\n{exc}")
+            return
+        self.device_report_path = report_dir / "device-readiness-report.md"
+        self.device_output.setPlainText(f"Inspecting {serial} with read-only ADB commands...\\nReport: {self.device_report_path}")
+        self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(self.device_report_path)], "Device inspection")
 
     def choose_workdir(self) -> None:
         path = QFileDialog.getExistingDirectory(self, "Select build work directory", self.workdir.text())
