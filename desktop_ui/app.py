@@ -659,9 +659,17 @@ class DesktopWindow(QMainWindow):
             if not chosen:
                 self.device_image.setText("No licensed image found for this device.")
                 search_url = "https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search=" + urllib.parse.quote(display_name)
+                gsmarena_url = (
+                    "https://www.gsmarena.com/sony_xperia_r1_%28plus%29-8922.php"
+                    if "g2199" in normalized or "xperia r1" in normalized
+                    else "https://www.gsmarena.com/samsung_galaxy_a04e-11945.php"
+                    if "a04e" in normalized or "sm-a042f" in normalized
+                    else ""
+                )
+                fallback_links = f'<br><a href="{gsmarena_url}">View device photos on GSMArena</a>' if gsmarena_url else ""
                 self.device_image_source.setText(
-                    f'<a href="{search_url}">Search Wikimedia Commons manually</a><br>'
-                    "No suitable result was returned by the automatic search. You can still inspect the device without an image."
+                    f'<a href="{search_url}">Search Wikimedia Commons manually</a>{fallback_links}<br>'
+                    "No suitable reusable image was found automatically. You can still inspect the device without an image."
                 )
                 return
 
@@ -687,9 +695,17 @@ class DesktopWindow(QMainWindow):
         except (OSError, ValueError, json.JSONDecodeError, KeyError) as exc:
             self.device_image.setText("Image lookup failed")
             search_url = "https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search=" + urllib.parse.quote(display_name)
+            gsmarena_url = (
+                "https://www.gsmarena.com/sony_xperia_r1_%28plus%29-8922.php"
+                if "g2199" in normalized or "xperia r1" in normalized
+                else "https://www.gsmarena.com/samsung_galaxy_a04e-11945.php"
+                if "a04e" in normalized or "sm-a042f" in normalized
+                else ""
+            )
+            fallback_links = f'<br><a href="{gsmarena_url}">View device photos on GSMArena</a>' if gsmarena_url else ""
             self.device_image_source.setText(
                 f"Could not retrieve an image: {exc}<br>"
-                f'<a href="{search_url}">Open Commons search</a>'
+                f'<a href="{search_url}">Open Commons search</a>{fallback_links}'
             )
         finally:
             QApplication.restoreOverrideCursor()
