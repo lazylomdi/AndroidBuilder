@@ -55,6 +55,8 @@ class DeviceInspectorTests(unittest.TestCase):
                 "[ro.product.cpu.abi]: [arm64-v8a]\n", ""),
             subprocess.CompletedProcess(["adb", "shell", "cat"], 0, "MemTotal:       2097152 kB\n", ""),
             subprocess.CompletedProcess(["adb", "shell", "uname"], 0, "5.10.1\n", ""),
+            subprocess.CompletedProcess(["adb", "shell", "df", "-h", "/data"], 0,
+                "Filesystem      Size  Used Avail Use% Mounted on\n/dev/block/dm-0  10G   6G   4G   60% /data\n", ""),
         ]
         result = device_inspector.inspect_device()
         self.assertEqual(result["status"], "OK")
@@ -62,6 +64,8 @@ class DeviceInspectorTests(unittest.TestCase):
         self.assertEqual(result["device"]["codename"], "demo")
         self.assertEqual(result["device"]["kernel_version"], "5.10.1")
         self.assertEqual(result["device"]["ram_gb"], 2.0)
+        self.assertEqual(result["device"]["data_partition_storage"]["filesystem"], "/dev/block/dm-0")
+        self.assertEqual(result["device"]["data_partition_storage"]["available"], "4G")
         self.assertIsNone(result["device"]["bootloader_unlock"])
         self.assertIn("No device files or settings were changed.", result["limitations"])
         self.assertIn("Bootloader unlock eligibility/status is not inferred from these properties.", result["limitations"])
