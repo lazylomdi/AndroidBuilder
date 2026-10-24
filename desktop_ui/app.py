@@ -948,7 +948,7 @@ class DesktopWindow(QMainWindow):
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
                     self.device_output.setMarkdown(report)
-                    self.device_summary.setText(self.summarize_readiness_report(report, code))
+                    self.device_summary.setText(summarize_readiness_report(report, code))
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
                 except OSError as exc:
                     self.device_output.append(f"Could not read readiness report: {exc}")
