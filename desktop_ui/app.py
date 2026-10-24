@@ -455,7 +455,7 @@ class DesktopWindow(QMainWindow):
             else:
                 self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
         if result.stderr.strip():
-            self.device_output.appendPlainText("\nADB stderr:\n" + result.stderr.strip())
+            self.device_output.append("ADB stderr:<br>" + result.stderr.strip().replace("\n", "<br>"))
 
     def inspect_device(self) -> None:
         item = self.device_list.currentItem()
