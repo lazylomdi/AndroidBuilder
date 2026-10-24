@@ -18,6 +18,7 @@ This tracker records implementation status separately from verified test results
 - Technical report copy/export controls.
 - Recent UI change: concise summary parser extracted into a Qt-independent module and detailed report hidden until requested.
 - Guided phone checks now return to the beginner screen with the inspection summary or an explicit report-load/failure message.
+- The guided phone-check screen now includes a collapsible detailed technical report after inspection.
 - Fixed literal escaped newline rendering in the ADB-not-found, no-device, and multiple-device explanatory text.
 - Added unit tests for report-summary parsing.
 
@@ -40,7 +41,7 @@ This tracker records implementation status separately from verified test results
 - [ ] Multiple devices are never silently selected.
 - [ ] Unauthorized/offline device states give actionable next steps.
 - [ ] Summary status matches the Markdown report's Compatibility summary section.
-- [ ] Technical details are collapsed by default and can be shown/hidden.
+- [ ] Technical details are collapsed by default and can be shown/hidden in both guided phone check and Device Manager.
 - [ ] Copy and export work with a completed report.
 - [ ] Linux and Windows status is tested or transparently documented.
 
