@@ -66,6 +66,7 @@ class DesktopWindow(QMainWindow):
         self.device_report_path: Path | None = None
         self.active_task = ""
         self.guided_inspection = False
+        self.last_device_report = ""
 
         root = QWidget()
         layout = QHBoxLayout(root)
@@ -389,8 +390,31 @@ class DesktopWindow(QMainWindow):
         actions.addWidget(select)
         actions.addStretch()
         box.addLayout(actions)
+
+        self.phone_technical_toggle = make_button("Show detailed technical report")
+        self.phone_technical_toggle.setCheckable(True)
+        self.phone_technical_toggle.toggled.connect(self.toggle_phone_technical_details)
+        box.addWidget(self.phone_technical_toggle)
+        self.phone_technical_report = QTextBrowser()
+        self.phone_technical_report.setReadOnly(True)
+        self.phone_technical_report.setOpenExternalLinks(False)
+        self.phone_technical_report.setObjectName("deviceReport")
+        self.phone_technical_report.setMinimumHeight(180)
+        self.phone_technical_report.setVisible(False)
+        box.addWidget(self.phone_technical_report, 1)
         box.addStretch()
         return page
+
+    def toggle_phone_technical_details(self, expanded: bool) -> None:
+        """Show or hide the full report directly on the guided phone-check page."""
+        self.phone_technical_report.setVisible(expanded)
+        self.phone_technical_toggle.setText(
+            "Hide detailed technical report" if expanded else "Show detailed technical report"
+        )
+        if expanded and not self.last_device_report:
+            self.phone_technical_report.setPlainText(
+                "No inspection report is available yet. Scan for phones and run an inspection first."
+            )
 
     def continue_phone_check(self) -> None:
         """Continue to inspection when exactly one authorized device is available."""
@@ -952,7 +976,9 @@ class DesktopWindow(QMainWindow):
             if self.device_report_path is not None and self.device_report_path.is_file():
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
+                    self.last_device_report = report
                     self.device_output.setMarkdown(report)
+                    self.phone_technical_report.setMarkdown(report)
                     summary = summarize_readiness_report(report, code)
                     self.device_summary.setText(summary)
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
