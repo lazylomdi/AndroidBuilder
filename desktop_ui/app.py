@@ -23,6 +23,24 @@ ROOT = Path(__file__).resolve().parents[1]
 ROMFORGE = ROOT / "romforge.py"
 
 
+def adb_help(message: str) -> str:
+    """Turn common ADB failures into beginner-friendly next steps."""
+    lowered = message.lower()
+    if "not found" in lowered or "no such file" in lowered:
+        return "Next steps: install Android SDK Platform-Tools, ensure adb is on PATH, restart AndroidBuilder, then refresh devices."
+    if "unauthorized" in lowered or "authoriz" in lowered:
+        return "Next steps: unlock the phone, accept the USB debugging prompt, tick “Always allow” only if this is your trusted computer, then refresh devices."
+    if "offline" in lowered:
+        return "Next steps: reconnect the USB cable, try another data-capable cable or USB port, keep the phone unlocked, then refresh devices."
+    if "timed out" in lowered or "timeout" in lowered:
+        return "Next steps: reconnect the phone, keep it awake and unlocked, then retry. If it persists, restart the ADB server manually and refresh."
+    if "multiple" in lowered:
+        return "Next steps: select the exact phone by model and serial number. AndroidBuilder will not guess which device you intended."
+    if "permission" in lowered or "access is denied" in lowered:
+        return "Next steps: check USB debugging authorization and operating-system USB permissions. Do not run the app as administrator/root unless your platform setup specifically requires it."
+    return "Next steps: check the USB data cable and port, keep the phone unlocked, confirm USB debugging is enabled and authorized, then refresh. Technical error details are shown above."
+
+
 def make_button(text: str, primary: bool = False) -> QPushButton:
     button = QPushButton(text)
     button.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -501,7 +519,7 @@ class DesktopWindow(QMainWindow):
             self.device_list.addItem("ADB not found on PATH")
             self.sidebar_device_name.setText("ADB unavailable")
             self.sidebar_device_info.setText("Install Android platform tools, then refresh.")
-            self.device_output.setPlainText("ADB was not found on PATH. Install platform-tools and click Refresh devices.")
+            self.device_output.setPlainText("ADB was not found on PATH.\\n\\n" + adb_help("ADB not found"))
             self.device_count_label.setText("ADB unavailable — install Android Platform-Tools")
             return
         try:
@@ -559,7 +577,7 @@ class DesktopWindow(QMainWindow):
             self.device_list.addItem("No devices detected")
             self.sidebar_device_name.setText("No device detected")
             self.sidebar_device_info.setText("Check USB debugging, cable, and authorization.")
-            self.device_output.setPlainText("No ADB devices found. Connect one or more phones, enable USB debugging, accept authorization prompts, then refresh.")
+            self.device_output.setPlainText("No ADB devices found.\\n\\n" + adb_help("no devices detected"))
             self.device_count_label.setText("0 devices detected")
         else:
             ready_count = sum(1 for entry in device_items if entry.data(Qt.ItemDataRole.UserRole + 1) == "device")
