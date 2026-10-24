@@ -282,6 +282,9 @@ class DesktopWindow(QMainWindow):
         self.device_list.setMinimumWidth(250)
         self.device_list.setMinimumHeight(240)
         self.device_list.setUniformItemSizes(True)
+        self.device_count_label = QLabel("No devices scanned yet")
+        self.device_count_label.setObjectName("muted")
+        self.device_list.currentItemChanged.connect(self.update_selected_device_summary)
         splitter.addWidget(self.device_list)
         details = QFrame()
         details.setObjectName("card")
@@ -289,6 +292,7 @@ class DesktopWindow(QMainWindow):
         title = QLabel("Device inspection")
         title.setObjectName("sectionTitle")
         detail_box.addWidget(title)
+        detail_box.addWidget(self.device_count_label)
         detail_box.addWidget(QLabel(
             "Refresh lists ADB devices. Inspection invokes the existing opt-in readiness command and is read-only. "
             "It does not unlock, root, reboot, erase, or flash the phone."
@@ -410,12 +414,14 @@ class DesktopWindow(QMainWindow):
 
     def refresh_devices(self) -> None:
         self.device_list.clear()
+        self.device_count_label.setText("Scanning connected devices…")
         adb = shutil.which("adb")
         if not adb:
             self.device_list.addItem("ADB not found on PATH")
             self.sidebar_device_name.setText("ADB unavailable")
             self.sidebar_device_info.setText("Install Android platform tools, then refresh.")
             self.device_output.setPlainText("ADB was not found on PATH. Install platform-tools and click Refresh devices.")
+            self.device_count_label.setText("ADB unavailable — install Android Platform-Tools")
             return
         try:
             result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False)
@@ -424,6 +430,7 @@ class DesktopWindow(QMainWindow):
             self.sidebar_device_name.setText("ADB error")
             self.sidebar_device_info.setText(str(exc))
             self.device_output.setPlainText(f"Could not query ADB devices:\n{exc}")
+            self.device_count_label.setText("Device scan failed — see details")
             return
         device_items = []
         for raw in result.stdout.splitlines()[1:]:
@@ -462,10 +469,14 @@ class DesktopWindow(QMainWindow):
             self.device_list.addItem("No devices detected")
             self.sidebar_device_name.setText("No device detected")
             self.sidebar_device_info.setText("Check USB debugging, cable, and authorization.")
-            self.device_output.setPlainText("No ADB devices found. Keep the phone unlocked and run adb devices -l in a terminal.")
+            self.device_output.setPlainText("No ADB devices found. Connect one or more phones, enable USB debugging, accept authorization prompts, then refresh.")
+            self.device_count_label.setText("0 devices detected")
         else:
             selected = next((item for item in device_items if item.data(Qt.ItemDataRole.UserRole + 1) == "device"), device_items[0])
             self.device_list.setCurrentItem(selected)
+            ready_count = sum(1 for entry in device_items if entry.data(Qt.ItemDataRole.UserRole + 1) == "device")
+            unauthorized_count = sum(1 for entry in device_items if entry.data(Qt.ItemDataRole.UserRole + 1) == "unauthorized")
+            self.device_count_label.setText(f"{len(device_items)} device(s) detected · {ready_count} ready · {unauthorized_count} awaiting authorization. Select a device before inspecting.")
             serial = selected.data(Qt.ItemDataRole.UserRole)
             state = selected.data(Qt.ItemDataRole.UserRole + 1)
             display_name = selected.data(Qt.ItemDataRole.UserRole + 2) or serial
@@ -480,6 +491,34 @@ class DesktopWindow(QMainWindow):
                 self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
         if result.stderr.strip():
             self.device_output.append("ADB stderr:<br>" + result.stderr.strip().replace("\n", "<br>"))
+
+    def update_selected_device_summary(self, current, previous=None) -> None:
+        """Keep the summary tied to the currently selected device in multi-device setups."""
+        if current is None:
+            return
+        serial = current.data(Qt.ItemDataRole.UserRole)
+        state = current.data(Qt.ItemDataRole.UserRole + 1)
+        display_name = current.data(Qt.ItemDataRole.UserRole + 2) or serial
+        if not serial or state is None:
+            return
+        total = sum(
+            1 for index in range(self.device_list.count())
+            if self.device_list.item(index).data(Qt.ItemDataRole.UserRole)
+        )
+        self.sidebar_device_name.setText(display_name)
+        self.sidebar_device_info.setText(f"Selected: {serial} · ADB: {state} · {total} device(s) detected")
+        if state == "device":
+            self.device_output.setPlainText(
+                f"Selected device: {display_name}\nSerial: {serial}\n"
+                f"ADB state: {state}\n\n"
+                "Only this selected serial will be used for inspection. "
+                "Choose another row to inspect a different device."
+            )
+        else:
+            self.device_output.setPlainText(
+                f"Selected device: {display_name}\nSerial: {serial}\nADB state: {state}\n\n"
+                "This device is not ready for inspection. Resolve its ADB state, then refresh."
+            )
 
     def find_device_image(self) -> None:
         """Find a freely hosted Commons image matching the selected device."""
