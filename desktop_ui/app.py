@@ -127,7 +127,6 @@ class DesktopWindow(QMainWindow):
             self.pages.addWidget(page)
 
         self.apply_styles()
-        self.refresh_environment()
         self.refresh_devices()
 
     def change_page(self, index: int) -> None:
@@ -514,21 +513,6 @@ class DesktopWindow(QMainWindow):
         self.log.clear()
         self.nav.setCurrentRow(2)
         self.run_command(args, "ROM build")
-
-    def refresh_environment(self) -> None:
-        def check(cmd: str) -> str:
-            path = shutil.which(cmd)
-            return f"Available · {path}" if path else "Not found on PATH"
-        self.replace_card_metric(self.python_card, sys.version.split()[0], sys.executable)
-        self.replace_card_metric(self.git_card, "Available" if shutil.which("git") else "Missing", check("git"))
-        self.replace_card_metric(self.adb_card, "Available" if shutil.which("adb") else "Optional", check("adb"))
-
-    @staticmethod
-    def replace_card_metric(card: QFrame, value: str, detail: str) -> None:
-        labels = card.findChildren(QLabel)
-        if len(labels) >= 3:
-            labels[1].setText(value)
-            labels[2].setText(detail)
 
     def refresh_devices(self) -> None:
         self.device_list.clear()
