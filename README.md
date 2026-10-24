@@ -23,14 +23,41 @@ Device inspection is opt-in and read-only: it runs `adb devices -l`, `getprop`, 
 
 ## Desktop UI (Windows 10 and Ubuntu)
 
-An optional PySide6 desktop app provides a dashboard, build wizard, live process logs, and read-only ADB device manager.
+AndroidBuilder includes a PySide6 desktop application for a device-first workflow. The dashboard lists Android devices visible to ADB as selectable phone tiles. Select a tile to open its dedicated device page; the app automatically runs a read-only inspection and displays a plain-language summary plus the detailed Markdown report. The device page also provides **Copy report** and **Export report** actions. Use **Home** to return to the dashboard and **Help** for connection instructions and dependency availability checks.
+
+### Launch
+
+Install the UI dependencies and start the application from the repository root:
 
 ```bash
 python3 -m pip install -r requirements-ui.txt
 python3 run_desktop_ui.py
 ```
 
-On Windows PowerShell, use `py -3 -m pip install -r requirements-ui.txt` and `python run_desktop_ui.py`. See [desktop UI instructions](docs/desktop-ui.md). The GUI defaults to dry-run and invokes the existing Python CLI; full ROM builds should run in Ubuntu/WSL2.
+For an existing virtual environment, activate it first and use `python -m pip install -r requirements-ui.txt`, then launch with `python -m desktop_ui.app` or `python run_desktop_ui.py`.
+
+On Windows PowerShell:
+
+```powershell
+py -3 -m pip install -r requirements-ui.txt
+py -3 run_desktop_ui.py
+```
+
+### Connect and inspect a phone
+
+1. Install Android SDK Platform-Tools and ensure `adb` is available on `PATH`.
+2. On the phone, enable Developer options and USB debugging.
+3. Connect using a USB data cable, unlock the phone, and accept the USB debugging authorization prompt only if you trust the computer.
+4. Open AndroidBuilder and refresh the dashboard device list.
+5. Select the phone tile. The dedicated details page should automatically start the read-only inspection.
+
+The Help dialog lists common dependency availability. A tool marked available is discoverable by the running application; this does not mean every build backend is fully configured. Docker and GitHub CLI are optional and only relevant to corresponding workflows.
+
+### Safety and compatibility limits
+
+Device inspection reads information exposed by ADB. It does **not** unlock, root, reboot, erase, or flash the phone. A detected device and its reported properties are not proof of Ubuntu Touch port support, bootability, or working hardware. Treat `UNKNOWN` and `Not enough information` as incomplete evidence, not as a positive or negative compatibility verdict.
+
+The desktop UI is a front end to existing ROMForge commands; it does not itself guarantee that a ROM can be built. Full Android ROM builds should be performed in a suitably configured Linux environment (Ubuntu/WSL2 is recommended for Windows users). See [desktop UI instructions](docs/desktop-ui.md), [device readiness](docs/device-readiness.md), and [Windows setup](docs/windows-setup.md).
 
 ## Ubuntu setup
 
