@@ -13,7 +13,7 @@ chmod +x setup_ubuntu.sh
 
 The default run is checks-only: it reports whether Git, Python 3, ADB, and curl are available, lists attached ADB devices if possible, prints the readiness CLI help, and runs the unit tests. It does not install packages unless you explicitly pass an installation option.
 
-Install common tools using Ubuntu's package manager:
+Install common tools and desktop UI runtime libraries (including D-Bus and Qt/X11 libraries used by PySide6) using Ubuntu's package manager:
 
 ```bash
 ./setup_ubuntu.sh --install-tools
@@ -39,7 +39,7 @@ You can combine options, for example:
 ./setup_ubuntu.sh --install-tools --install-python-deps
 ```
 
-The script uses `sudo apt-get` only when an installation flag is supplied. Review the script before running it if you need to follow organization-specific package policies.
+The `--install-python-deps` option installs both `requirements.txt` and `requirements-ui.txt` into `.venv`, so the PySide6 UI dependencies are included. The `--install-tools` option installs D-Bus and common Qt/X11 runtime libraries as well as Git, Python, ADB, and other utilities. The script uses `sudo apt-get` only when an installation flag is supplied. Review the script before running it if you need to follow organization-specific package policies.
 
 ## Manual setup
 
