@@ -41,6 +41,7 @@ class DesktopWindow(QMainWindow):
         self.process.errorOccurred.connect(self.process_error)
         self.build_running = False
         self.device_report_path: Path | None = None
+        self.active_task = ""
 
         root = QWidget()
         layout = QHBoxLayout(root)
@@ -307,6 +308,7 @@ class DesktopWindow(QMainWindow):
         if self.process.state() != QProcess.ProcessState.NotRunning:
             QMessageBox.warning(self, "Task already running", "Wait for the current task to finish before starting another.")
             return
+        self.active_task = task_name
         self.build_status.setText(f"Running: {task_name}")
         self.progress.setVisible(True)
         self.cancel_button.setEnabled(True)
@@ -428,7 +430,17 @@ class DesktopWindow(QMainWindow):
             QMessageBox.critical(self, "Cannot save report", f"Could not create the report directory:\n{exc}")
             return
         self.device_report_path = report_dir / "device-readiness-report.md"
-        self.device_output.setPlainText(f"Inspecting {serial} with read-only ADB commands...\nReport: {self.device_report_path}")
+        try:
+            self.device_report_path.unlink(missing_ok=True)
+        except OSError as exc:
+            QMessageBox.critical(self, "Cannot prepare report", f"Could not clear the previous report:\n{exc}")
+            return
+        self.device_output.setPlainText(
+            f"Inspecting {serial} with read-only ADB commands...\n"
+            f"Saving report to: {self.device_report_path}\n"
+            "Waiting for the inspection command to finish..."
+        )
+        self.nav.setCurrentRow(3)
         self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(self.device_report_path)], "Device inspection")
 
     def choose_workdir(self) -> None:
@@ -454,14 +466,20 @@ class DesktopWindow(QMainWindow):
         self.build_status.setText("Completed successfully" if code == 0 else f"Finished with exit code {code}")
         self.log.appendPlainText(f"\n[Process exited with code {code}]")
         self.device_output.appendPlainText(f"\n[Process exited with code {code}]")
-        if self.device_report_path is not None and self.device_report_path.is_file():
-            try:
-                report = self.device_report_path.read_text(encoding="utf-8")
-                self.device_output.setPlainText(report)
-            except OSError as exc:
-                self.device_output.appendPlainText(f"\nCould not read readiness report: {exc}")
-        elif code != 0:
-            self.device_output.appendPlainText("\nInspection failed. See Build monitor for the full command output.")
+        if self.active_task == "Device inspection":
+            if self.device_report_path is not None and self.device_report_path.is_file():
+                try:
+                    report = self.device_report_path.read_text(encoding="utf-8")
+                    self.device_output.setPlainText(report)
+                    self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
+                except OSError as exc:
+                    self.device_output.appendPlainText(f"\nCould not read readiness report: {exc}")
+            else:
+                self.device_output.appendPlainText(
+                    f"\nInspection exited with code {code}, but no report was created. "
+                    "See Build monitor for stdout/stderr."
+                )
+        self.active_task = ""
         self.refresh_environment()
         self.refresh_devices()
 
