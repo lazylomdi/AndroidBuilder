@@ -502,14 +502,23 @@ class DesktopWindow(QMainWindow):
         image_actions.addWidget(find_image)
         image_actions.addWidget(save_image)
         image_actions.addStretch()
+        self.device_image_data: bytes | None = None
+        self.device_image_toggle = make_button("Show optional device image")
+        self.device_image_toggle.setCheckable(True)
+        self.device_image_toggle.toggled.connect(self.toggle_device_image_section)
+        detail_box.addWidget(self.device_image_toggle)
+        self.device_image_section = QWidget()
+        image_section_layout = QVBoxLayout(self.device_image_section)
+        image_section_layout.setContentsMargins(0, 0, 0, 0)
         image_heading = QLabel("Optional device image · Wikimedia Commons")
         image_heading.setObjectName("muted")
-        detail_box.addWidget(image_heading)
-        detail_box.addWidget(self.device_image)
+        image_section_layout.addWidget(image_heading)
+        image_section_layout.addWidget(self.device_image)
         self.device_image_source.setMaximumHeight(38)
-        detail_box.addWidget(self.device_image_source)
-        detail_box.addLayout(image_actions)
-        self.device_image_data: bytes | None = None
+        image_section_layout.addWidget(self.device_image_source)
+        image_section_layout.addLayout(image_actions)
+        self.device_image_section.setVisible(False)
+        detail_box.addWidget(self.device_image_section)
         self.device_summary = QLabel("No inspection results yet. Select an authorized phone and run the read-only check.")
         self.device_summary.setObjectName("notice")
         self.device_summary.setWordWrap(True)
@@ -1001,6 +1010,13 @@ class DesktopWindow(QMainWindow):
                     self.phone_check_detail.setText(error_summary)
                     self.nav.setCurrentRow(1)
             self.guided_inspection = False
+    def toggle_device_image_section(self, expanded: bool) -> None:
+        """Keep optional image search out of the main readiness-results view."""
+        self.device_image_section.setVisible(expanded)
+        self.device_image_toggle.setText(
+            "Hide optional device image" if expanded else "Show optional device image"
+        )
+
     def toggle_technical_details(self, expanded: bool) -> None:
         self.device_output.setVisible(expanded)
         self.report_actions_widget.setVisible(expanded)
