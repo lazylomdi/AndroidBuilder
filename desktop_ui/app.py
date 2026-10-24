@@ -279,7 +279,8 @@ class DesktopWindow(QMainWindow):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setChildrenCollapsible(False)
         self.device_list = QListWidget()
-        self.device_list.setMinimumWidth(250)
+        self.device_list.setMinimumWidth(190)
+        self.device_list.setMaximumWidth(340)
         self.device_list.setMinimumHeight(240)
         self.device_list.setUniformItemSizes(True)
         self.device_count_label = QLabel("No devices scanned yet")
@@ -293,14 +294,17 @@ class DesktopWindow(QMainWindow):
         title.setObjectName("sectionTitle")
         detail_box.addWidget(title)
         detail_box.addWidget(self.device_count_label)
-        detail_box.addWidget(QLabel(
-            "Refresh lists ADB devices. Inspection invokes the existing opt-in readiness command and is read-only. "
-            "It does not unlock, root, reboot, erase, or flash the phone."
-        ))
+        guidance = QLabel(
+            "Refresh lists ADB devices. Inspection is read-only; it will not unlock, root, reboot, erase, or flash your phone."
+        )
+        guidance.setObjectName("muted")
+        guidance.setWordWrap(True)
+        detail_box.addWidget(guidance)
         self.device_image = QLabel("No device image loaded")
         self.device_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.device_image.setMinimumHeight(180)
-        self.device_image.setMaximumHeight(260)
+        self.device_image.setMinimumHeight(100)
+        self.device_image.setMaximumHeight(150)
+        self.device_image.setMinimumWidth(0)
         self.device_image.setScaledContents(False)
         self.device_image_source = QLabel("Images are searched on Wikimedia Commons; license/source details are shown below.")
         self.device_image_source.setWordWrap(True)
@@ -313,8 +317,11 @@ class DesktopWindow(QMainWindow):
         image_actions.addWidget(find_image)
         image_actions.addWidget(save_image)
         image_actions.addStretch()
-        detail_box.addWidget(QLabel("Device image (Wikimedia Commons)"))
+        image_heading = QLabel("Optional device image · Wikimedia Commons")
+        image_heading.setObjectName("muted")
+        detail_box.addWidget(image_heading)
         detail_box.addWidget(self.device_image)
+        self.device_image_source.setMaximumHeight(48)
         detail_box.addWidget(self.device_image_source)
         detail_box.addLayout(image_actions)
         self.device_image_data: bytes | None = None
@@ -322,12 +329,22 @@ class DesktopWindow(QMainWindow):
         self.device_output.setReadOnly(True)
         self.device_output.setOpenExternalLinks(False)
         self.device_output.setObjectName("deviceReport")
-        self.device_output.setPlaceholderText("Device command output appears here.")
+        self.device_output.setPlaceholderText("Inspect a selected phone to view its report.")
+        self.device_output.setMinimumWidth(0)
         detail_box.addWidget(self.device_output, 1)
+        report_actions = QHBoxLayout()
+        copy_report = make_button("Copy report")
+        copy_report.clicked.connect(self.copy_device_report)
+        export_report = make_button("Export report…")
+        export_report.clicked.connect(self.export_device_report)
+        report_actions.addWidget(copy_report)
+        report_actions.addWidget(export_report)
+        report_actions.addStretch()
+        detail_box.addLayout(report_actions)
         splitter.addWidget(details)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3)
-        splitter.setSizes([320, 760])
+        splitter.setStretchFactor(0, 0)
+        splitter.setStretchFactor(1, 1)
+        splitter.setSizes([240, 760])
         box.addWidget(splitter, 1)
         actions = QHBoxLayout()
         refresh = make_button("Refresh devices", True)
@@ -339,6 +356,37 @@ class DesktopWindow(QMainWindow):
         actions.addStretch()
         box.addLayout(actions)
         return page
+
+    def copy_device_report(self) -> None:
+        """Copy the complete rendered report as Markdown/plain text to the clipboard."""
+        report = self.device_output.toMarkdown().strip()
+        if not report:
+            QMessageBox.information(self, "No report yet", "Inspect a connected device before copying its report.")
+            return
+        QApplication.clipboard().setText(report)
+        self.build_status.setText("Device report copied")
+        QMessageBox.information(self, "Report copied", "The inspection report has been copied to the clipboard.")
+
+    def export_device_report(self) -> None:
+        """Export the current report as a Markdown file."""
+        report = self.device_output.toMarkdown().strip()
+        if not report:
+            QMessageBox.information(self, "No report yet", "Inspect a connected device before exporting its report.")
+            return
+        default_name = "androidbuilder-device-report.md"
+        if self.device_report_path is not None:
+            default_name = self.device_report_path.name
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export device report", default_name, "Markdown report (*.md);;Text file (*.txt)"
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(report + "\n", encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.critical(self, "Export failed", f"Could not save the report:\n{exc}")
+            return
+        QMessageBox.information(self, "Report exported", f"Report saved to:\n{path}")
 
     def run_command(self, args: list[str], task_name: str) -> None:
         if self.process.state() != QProcess.ProcessState.NotRunning:
@@ -708,7 +756,7 @@ class DesktopWindow(QMainWindow):
             #eyebrow { color: #777780; font-size: 9px; font-weight: 700; letter-spacing: 1px; padding: 0 4px 8px; }
             #muted { color: #9999a2; }
             #pageTitle { font-size: 25px; font-weight: 700; color: #f1f1f4; }
-            QListWidget { background: transparent; border: 0; outline: 0; padding: 8px 4px; }
+            QListWidget { background: transparent; border: 0; outline: 0; padding: 8px 4px; min-width: 0; }
             QListWidget::item { padding: 13px 12px; border-radius: 5px; margin: 2px 0; color: #a6a6af; }
             QListWidget::item:selected { background: #29292e; color: #ffffff; border-left: 2px solid #a855f7; font-weight: 600; }
             #card, QGroupBox { background: #1b1b1e; border: 1px solid #2b2b30; border-radius: 8px; }
@@ -726,6 +774,7 @@ class DesktopWindow(QMainWindow):
             QCheckBox { spacing: 8px; color: #d6d6dc; }
             QPlainTextEdit { font-family: Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
             QTextBrowser#deviceReport { background: #141416; color: #ededf0; border: 1px solid #333339; border-radius: 6px; padding: 12px; font-size: 12px; }
+            QTextBrowser#deviceReport { min-width: 0; }
             QTextBrowser#deviceReport h1, QTextBrowser#deviceReport h2 { color: #f0f0f4; }
             QTextBrowser#deviceReport a { color: #75cfc1; }
             QPushButton { background: #202023; color: #dedee4; border: 1px solid #34343a; border-radius: 6px; padding: 9px 15px; font-weight: 600; }
