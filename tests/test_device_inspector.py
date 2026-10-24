@@ -68,7 +68,7 @@ class DeviceInspectorTests(unittest.TestCase):
         self.assertEqual(result["device"]["data_storage"]["available"], "4G")
         self.assertIsNone(result["device"]["bootloader_unlock"])
         self.assertIn("No device files or settings were changed.", result["limitations"])
-        self.assertIn("Bootloader unlock eligibility/status is not inferred from these properties.", result["limitations"])
+        self.assertTrue(any("Bootloader unlock eligibility is separate from current lock state" in item for item in result["limitations"]))
 
 
 if __name__ == "__main__":
