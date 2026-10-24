@@ -155,6 +155,7 @@ class DesktopWindow(QMainWindow):
         ]
         self.page_title.setText(titles[index][0])
         self.page_subtitle.setText(titles[index][1])
+        self.home_button.setVisible(False)
 
     def card(self, title: str, value: str, detail: str = "") -> QFrame:
         frame = QFrame()
@@ -312,9 +313,14 @@ class DesktopWindow(QMainWindow):
         """Show connection instructions and a local dependency availability check."""
         checks = [
             ("Python", sys.executable if sys.executable else ""),
+            ("PySide6 desktop UI", sys.executable if sys.executable else ""),
             ("ROMForge CLI", str(ROMFORGE) if ROMFORGE.is_file() else ""),
             ("ADB / Android Platform-Tools", shutil.which("adb") or ""),
             ("Git", shutil.which("git") or ""),
+            ("Java (ROM build prerequisite)", shutil.which("java") or ""),
+            ("repo tool (Android source sync)", shutil.which("repo") or ""),
+            ("Docker (optional backend)", shutil.which("docker") or ""),
+            ("GitHub CLI (optional backend)", shutil.which("gh") or ""),
         ]
         lines = ["DEPENDENCY CHECK"]
         for name, value in checks:
@@ -1219,6 +1225,10 @@ class DesktopWindow(QMainWindow):
             QPushButton:hover { background: #2a2a30; border-color: #4b4b55; }
             QPushButton#primaryButton { background: #6550a8; color: white; border-color: #8068ce; }
             QPushButton#primaryButton:hover { background: #7962bf; }
+            QPushButton#deviceTile { background: #1b1b21; border: 1px solid #34343e; border-radius: 10px; padding: 14px; }
+            QPushButton#deviceTile:hover { background: #29292f; border-color: #8068ce; }
+            #phoneIcon { font-size: 44px; padding: 8px; }
+            #deviceTileName { font-size: 13px; font-weight: 700; color: #f0f0f4; }
             #heroCard { background: #1b1b21; border: 1px solid #34343e; border-radius: 10px; }\n            #heroTitle { color: #f5f3ff; font-size: 26px; font-weight: 700; padding-top: 4px; padding-bottom: 4px; }\n            #statusPill { background: #142b27; color: #75cfc1; border: 1px solid #244a43; border-radius: 6px; padding: 9px; font-weight: 600; }
             QProgressBar { border: 0; background: #29292e; border-radius: 4px; height: 8px; text-align: center; }
             QProgressBar::chunk { background: #58b9a9; border-radius: 4px; }
