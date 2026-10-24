@@ -18,7 +18,7 @@ from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMessageBox, QPlainTextEdit,
     QProgressBar, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QSplitter, QTextBrowser,
-    QWidget, QFileDialog, QCheckBox, QGroupBox,
+    QWidget, QFileDialog, QCheckBox, QGroupBox, QDialog, QTabWidget, QDialogButtonBox,
 )
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -310,38 +310,100 @@ class DesktopWindow(QMainWindow):
         self.refresh_devices()
 
     def show_help(self) -> None:
-        """Show connection instructions and a local dependency availability check."""
-        checks = [
-            ("Python", sys.executable if sys.executable else ""),
-            ("ROMForge CLI", str(ROMFORGE) if ROMFORGE.is_file() else ""),
-            ("ADB / Android Platform-Tools", shutil.which("adb") or ""),
-            ("Git", shutil.which("git") or ""),
-            ("Java (ROM build prerequisite)", shutil.which("java") or ""),
-            ("repo tool (Android source sync)", shutil.which("repo") or ""),
-            ("Docker (optional backend)", shutil.which("docker") or ""),
-            ("GitHub CLI (optional backend)", shutil.which("gh") or ""),
+        """Open structured help with phone setup steps and dependency status."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("AndroidBuilder Help")
+        dialog.resize(640, 500)
+        outer = QVBoxLayout(dialog)
+        tabs = QTabWidget()
+        outer.addWidget(tabs, 1)
+
+        connect_page = QWidget()
+        connect_layout = QVBoxLayout(connect_page)
+        intro = QLabel("Connect your Android phone")
+        intro.setObjectName("sectionTitle")
+        connect_layout.addWidget(intro)
+        steps = QLabel(
+            "1. Use a USB cable that supports data transfer.\n\n"
+            "2. Unlock your phone. In Settings, enable Developer options "
+            "and then USB debugging. The menu names vary by manufacturer.\n\n"
+            "3. Connect the phone to this computer. When prompted on the phone, "
+            "review the computer's RSA fingerprint and accept only if you trust this computer.\n\n"
+            "4. Click Home, then Refresh devices. Your phone should appear as a tile.\n\n"
+            "5. Select the phone tile and click Inspect / refresh details to run a read-only check."
+        )
+        steps.setWordWrap(True)
+        steps.setTextFormat(Qt.TextFormat.PlainText)
+        connect_layout.addWidget(steps)
+        cable_note = QLabel(
+            "If the phone does not appear: try another data cable or USB port, keep the phone unlocked, "
+            "recheck the authorization prompt, and refresh again."
+        )
+        cable_note.setObjectName("notice")
+        cable_note.setWordWrap(True)
+        connect_layout.addWidget(cable_note)
+        connect_layout.addStretch()
+        tabs.addTab(connect_page, "Connect a phone")
+
+        deps_page = QWidget()
+        deps_layout = QVBoxLayout(deps_page)
+        deps_intro = QLabel("Dependency availability")
+        deps_intro.setObjectName("sectionTitle")
+        deps_layout.addWidget(deps_intro)
+        deps_note = QLabel(
+            "Available means the tool can be found from this running application. "
+            "Optional tools are only needed for their corresponding build backend."
+        )
+        deps_note.setObjectName("muted")
+        deps_note.setWordWrap(True)
+        deps_layout.addWidget(deps_note)
+        dependency_rows = [
+            ("Python", bool(sys.executable), "Runs AndroidBuilder"),
+            ("PySide6", self._module_available("PySide6"), "Desktop interface"),
+            ("ROMForge CLI", ROMFORGE.is_file(), "Inspection and build commands"),
+            ("ADB / Platform-Tools", bool(shutil.which("adb")), "Phone detection and inspection"),
+            ("Git", bool(shutil.which("git")), "Source control and source checkout"),
+            ("Java", bool(shutil.which("java")), "Android build prerequisite"),
+            ("repo", bool(shutil.which("repo")), "Android source synchronization"),
+            ("Docker (optional)", bool(shutil.which("docker")), "Docker build backend"),
+            ("GitHub CLI (optional)", bool(shutil.which("gh")), "GitHub Actions workflow support"),
         ]
-        lines = ["DEPENDENCY CHECK"]
-        for name, value in checks:
-            lines.append(f"{'✓ Available' if value else '✗ Not found'} — {name}" + (f": {value}" if value else ""))
+        for name, available, purpose in dependency_rows:
+            row = QFrame()
+            row.setObjectName("card")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(10, 7, 10, 7)
+            status = QLabel("✓ Found" if available else "✕ Missing")
+            status.setMinimumWidth(85)
+            status.setStyleSheet("color: #75cfc1;" if available else "color: #ff8b8b;")
+            detail = QLabel(f"{name}\n{purpose}")
+            detail.setWordWrap(True)
+            row_layout.addWidget(status)
+            row_layout.addWidget(detail, 1)
+            deps_layout.addWidget(row)
+        deps_layout.addStretch()
+        tabs.addTab(deps_page, "Dependencies")
+
+        note = QLabel(
+            "This is an availability check, not an installer. It does not prove that a phone supports "
+            "Ubuntu Touch or that a ROM build will succeed."
+        )
+        note.setObjectName("muted")
+        note.setWordWrap(True)
+        outer.addWidget(note)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        buttons.rejected.connect(dialog.reject)
+        buttons.accepted.connect(dialog.accept)
+        outer.addWidget(buttons)
+        dialog.exec()
+
+    @staticmethod
+    def _module_available(module_name: str) -> bool:
         try:
-            import PySide6  # noqa: F401
-            lines.append("✓ Available — PySide6")
+            __import__(module_name)
+            return True
         except ImportError:
-            lines.append("✗ Not found — PySide6")
-        lines.extend([
-            "",
-            "HOW TO CONNECT A PHONE",
-            "1. Use a USB cable that supports data, not charging only.",
-            "2. Unlock the Android phone and enable Developer options and USB debugging.",
-            "3. Connect the phone and accept the USB debugging authorization prompt.",
-            "4. Return to the dashboard and click Refresh devices.",
-            "5. Select the phone tile, then choose Inspect / refresh details.",
-            "",
-            "If ADB is missing, install Android SDK Platform-Tools and add its platform-tools folder to PATH, then restart AndroidBuilder.",
-            "This check reports whether common tools are discoverable; it does not install dependencies or prove a device is compatible."
-        ])
-        QMessageBox.information(self, "AndroidBuilder help", "\\n".join(lines))
+            return False
 
     def make_wizard(self) -> QWidget:
         page = QWidget()
