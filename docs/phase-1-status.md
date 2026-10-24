@@ -1,0 +1,47 @@
+# Phase 1: Beginner desktop workflow — completion tracker
+
+Last updated: 2026-10-24
+
+This tracker records implementation status separately from verified test results. A feature is not considered complete merely because code has been committed.
+
+## Current estimate
+
+**Estimated implementation progress: 75–80%.** This is a qualitative scope estimate, not a test-coverage metric. Phase 1 remains open until the acceptance checks below are validated.
+
+## Work completed or in place
+
+- Desktop navigation and dashboard.
+- Guided "Check my phone" entry point.
+- ADB device discovery and explicit handling for common scan failures.
+- Read-only device inspection report generation.
+- Compatibility summary in the report format, including conservative "Not enough information" handling.
+- Technical report copy/export controls.
+- Recent UI change: concise summary parser extracted into a Qt-independent module and detailed report hidden until requested.
+- Added unit tests for report-summary parsing.
+
+## Remaining work
+
+- Validate summary parsing and UI integration with the full automated test suite.
+- Keep the guided phone-check workflow coherent after inspection, including clear feedback for zero, one, multiple, unauthorized, and offline devices.
+- Validate report copy/export and details toggle in a running desktop app.
+- Resolve or document any outstanding desktop runtime issues.
+- Test on supported Linux and Windows environments, or explicitly document untested platforms.
+- Confirm packaging/launch instructions are adequate for a beginner.
+
+## Phase 1 acceptance checks
+
+- [ ] Python syntax check passes for the desktop app and summary module.
+- [ ] Automated tests pass.
+- [ ] App launches without an application-level exception.
+- [ ] No-device and ADB-unavailable paths are understandable.
+- [ ] One authorized device can be inspected.
+- [ ] Multiple devices are never silently selected.
+- [ ] Unauthorized/offline device states give actionable next steps.
+- [ ] Summary status matches the Markdown report's Compatibility summary section.
+- [ ] Technical details are collapsed by default and can be shown/hidden.
+- [ ] Copy and export work with a completed report.
+- [ ] Linux and Windows status is tested or transparently documented.
+
+## Reporting policy
+
+Progress updates should distinguish committed implementation, automated test results, and hands-on platform validation. Do not mark Phase 1 complete until all required checks are either passed or explicitly accepted as documented limitations.
