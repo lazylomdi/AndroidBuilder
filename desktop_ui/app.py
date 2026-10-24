@@ -813,7 +813,6 @@ class DesktopWindow(QMainWindow):
         self.device_output.append(f"[Process exited with code {code}]")
         task = self.active_task
         self.active_task = ""
-        self.refresh_environment()
         self.refresh_devices()
         # Refreshing devices updates the connection summary; for an inspection,
         # replace that summary with the completed report after the refresh.
