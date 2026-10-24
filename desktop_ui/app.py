@@ -250,6 +250,15 @@ class DesktopWindow(QMainWindow):
         self.detail_device_report.setOpenExternalLinks(False)
         self.detail_device_report.setPlaceholderText("The detailed device report will appear here after inspection.")
         box.addWidget(self.detail_device_report, 1)
+        report_actions = QHBoxLayout()
+        self.detail_copy_button = make_button("Copy report")
+        self.detail_copy_button.clicked.connect(self.copy_detail_device_report)
+        self.detail_export_button = make_button("Export report…")
+        self.detail_export_button.clicked.connect(self.export_detail_device_report)
+        report_actions.addWidget(self.detail_copy_button)
+        report_actions.addWidget(self.detail_export_button)
+        report_actions.addStretch()
+        box.addLayout(report_actions)
         actions = QHBoxLayout()
         self.detail_inspect_button = make_button("Inspect / refresh details", True)
         self.detail_inspect_button.clicked.connect(self.inspect_dashboard_device)
@@ -283,9 +292,8 @@ class DesktopWindow(QMainWindow):
         self.page_subtitle.setText("Technical summary and read-only inspection results for the selected phone.")
         self.home_button.setVisible(True)
         self.nav.clearSelection()
-        # A tile click should immediately load fresh details; do not require a
-        # second click on the inspection button.
-        QTimer.singleShot(0, self.inspect_dashboard_device)
+        # Tile clicks automatically start inspection without a second click.
+        QTimer.singleShot(0, lambda: self.inspect_dashboard_device(auto=True))
 
     def inspect_dashboard_device(self) -> None:
         serial = getattr(self, "selected_dashboard_serial", "")
@@ -302,7 +310,7 @@ class DesktopWindow(QMainWindow):
             QMessageBox.warning(self, "Device not ready", f"ADB reports state {item.data(Qt.ItemDataRole.UserRole + 1)!r}. Check the help instructions and refresh.")
             return
         self.guided_inspection = False
-        self.inspect_device()
+        self.inspect_device(skip_confirmation=auto)
 
     def go_home(self) -> None:
         self.home_button.setVisible(False)
@@ -749,6 +757,34 @@ class DesktopWindow(QMainWindow):
         box.addLayout(actions)
         return page
 
+    def copy_detail_device_report(self) -> None:
+        report = self.last_device_report.strip()
+        if not report:
+            QMessageBox.information(self, "No report yet", "Wait for inspection to finish before copying the report.")
+            return
+        QApplication.clipboard().setText(report)
+        QMessageBox.information(self, "Report copied", "The complete technical report has been copied.")
+
+    def export_detail_device_report(self) -> None:
+        report = self.last_device_report.strip()
+        if not report:
+            QMessageBox.information(self, "No report yet", "Wait for inspection to finish before exporting the report.")
+            return
+        serial = getattr(self, "selected_dashboard_serial", "device")
+        safe_name = "".join(ch if ch.isalnum() or ch in "-_" else "_" for ch in serial)
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Export device report", f"androidbuilder-{safe_name}-report.md",
+            "Markdown report (*.md);;Text file (*.txt)"
+        )
+        if not path:
+            return
+        try:
+            Path(path).write_text(report + "\n", encoding="utf-8")
+        except OSError as exc:
+            QMessageBox.critical(self, "Export failed", f"Could not save the report:\n{exc}")
+            return
+        QMessageBox.information(self, "Report exported", f"Report saved to:\n{path}")
+
     def copy_device_report(self) -> None:
         """Copy the complete rendered report as Markdown/plain text to the clipboard."""
         report = self.device_output.toMarkdown().strip()
@@ -1126,15 +1162,15 @@ class DesktopWindow(QMainWindow):
         if state != "device":
             QMessageBox.warning(self, "Device not ready", f"ADB reports state {state!r}. Unlock the phone and authorize USB debugging, then refresh.")
             return
-        answer = QMessageBox.question(
-            self, "Read-only inspection",
-            f"Inspect {serial} using the existing Ubuntu Touch readiness checker?\n\nThis is read-only and does not flash or change the phone.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel,
-        )
-        if answer != QMessageBox.StandardButton.Yes:
-            return
-        self.device_output.clear()
+        if not skip_confirmation:\n            answer = QMessageBox.question(
+                self, "Read-only inspection",
+                f"Inspect {serial} using the existing Ubuntu Touch readiness checker?\n\nThis is read-only and does not flash or change the phone.",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Cancel,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+            self.device_output.clear()
         self.device_summary.setText(f"Inspection running for {item.data(Qt.ItemDataRole.UserRole + 2) or serial}. This is a read-only check.")
         report_dir = Path.home() / ".local" / "share" / "AndroidBuilder"
         try:
