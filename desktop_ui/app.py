@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import os
+import json
+import urllib.parse
+import urllib.request
 import shutil
 import subprocess
 import sys
 from pathlib import Path
 
 from PySide6.QtCore import QProcess, Qt
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMessageBox, QPlainTextEdit,
@@ -290,6 +293,27 @@ class DesktopWindow(QMainWindow):
             "Refresh lists ADB devices. Inspection invokes the existing opt-in readiness command and is read-only. "
             "It does not unlock, root, reboot, erase, or flash the phone."
         ))
+        self.device_image = QLabel("No device image loaded")
+        self.device_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.device_image.setMinimumHeight(180)
+        self.device_image.setMaximumHeight(260)
+        self.device_image.setScaledContents(False)
+        self.device_image_source = QLabel("Images are searched on Wikimedia Commons; license/source details are shown below.")
+        self.device_image_source.setWordWrap(True)
+        self.device_image_source.setOpenExternalLinks(True)
+        image_actions = QHBoxLayout()
+        find_image = make_button("Find device image")
+        find_image.clicked.connect(self.find_device_image)
+        save_image = make_button("Save image…")
+        save_image.clicked.connect(self.save_device_image)
+        image_actions.addWidget(find_image)
+        image_actions.addWidget(save_image)
+        image_actions.addStretch()
+        detail_box.addWidget(QLabel("Device image (Wikimedia Commons)"))
+        detail_box.addWidget(self.device_image)
+        detail_box.addWidget(self.device_image_source)
+        detail_box.addLayout(image_actions)
+        self.device_image_data: bytes | None = None
         self.device_output = QTextBrowser()
         self.device_output.setReadOnly(True)
         self.device_output.setOpenExternalLinks(False)
@@ -456,6 +480,82 @@ class DesktopWindow(QMainWindow):
                 self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
         if result.stderr.strip():
             self.device_output.append("ADB stderr:<br>" + result.stderr.strip().replace("\n", "<br>"))
+
+    def find_device_image(self) -> None:
+        """Find a freely hosted Commons image matching the selected device."""
+        item = self.device_list.currentItem()
+        model_name = item.data(Qt.ItemDataRole.UserRole + 2) if item else ""
+        if not model_name or model_name == item.data(Qt.ItemDataRole.UserRole):
+            model_name = "Sony Xperia R1"
+        query = urllib.parse.urlencode({
+            "action": "query", "format": "json", "generator": "search",
+            "gsrsearch": f"file:{model_name}", "gsrnamespace": "6",
+            "gsrlimit": "8", "prop": "imageinfo", "iiprop": "url|extmetadata",
+            "iiurlwidth": "900",
+        })
+        api_url = "https://commons.wikimedia.org/w/api.php?" + query
+        self.device_image.setText("Searching Wikimedia Commons…")
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            request = urllib.request.Request(api_url, headers={"User-Agent": "AndroidBuilder/1.0 (device image lookup)"})
+            with urllib.request.urlopen(request, timeout=12) as response:
+                payload = json.loads(response.read().decode("utf-8"))
+            pages = payload.get("query", {}).get("pages", {})
+            chosen = None
+            for page in pages.values():
+                info = (page.get("imageinfo") or [{}])[0]
+                meta = info.get("extmetadata", {})
+                license_name = meta.get("LicenseShortName", {}).get("value", "")
+                if info.get("thumburl") and license_name:
+                    chosen = (info, meta, page.get("title", "Wikimedia Commons image"))
+                    break
+            if not chosen:
+                self.device_image.setText("No suitable licensed image found. Try the source link below.")
+                self.device_image_source.setText(
+                    f'<a href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search={urllib.parse.quote(model_name)}">Search Wikimedia Commons manually</a>'
+                )
+                return
+            info, meta, title = chosen
+            with urllib.request.urlopen(info["thumburl"], timeout=15) as response:
+                image_data = response.read()
+            pixmap = QPixmap()
+            if not pixmap.loadFromData(image_data):
+                raise ValueError("The image format could not be decoded.")
+            self.device_image_data = image_data
+            self.device_image.setPixmap(pixmap.scaled(
+                self.device_image.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                Qt.TransformationMode.SmoothTransformation))
+            license_name = meta.get("LicenseShortName", {}).get("value", "License not listed")
+            artist = meta.get("Artist", {}).get("value", "Author not listed")
+            description = meta.get("ImageDescription", {}).get("value", "")
+            source_url = info.get("descriptionurl", "https://commons.wikimedia.org/")
+            self.device_image_source.setText(
+                f'<b>{title}</b><br>License: {license_name}<br>Author: {artist}<br>'
+                f'<a href="{source_url}">Source and attribution</a>'
+            )
+        except (OSError, ValueError, json.JSONDecodeError, KeyError) as exc:
+            self.device_image.setText("Image lookup failed")
+            self.device_image_source.setText(
+                f"Could not retrieve an image: {exc}. "
+                f'<a href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search={urllib.parse.quote(model_name)}">Open Commons search</a>'
+            )
+        finally:
+            QApplication.restoreOverrideCursor()
+
+    def save_device_image(self) -> None:
+        if not self.device_image_data:
+            QMessageBox.information(self, "No image", "Find and load an image before saving.")
+            return
+        path, _ = QFileDialog.getSaveFileName(self, "Save device image", "device-image.jpg",
+                                               "Image files (*.jpg *.jpeg *.png *.webp)")
+        if not path:
+            return
+        try:
+            Path(path).write_bytes(self.device_image_data)
+        except OSError as exc:
+            QMessageBox.critical(self, "Save failed", f"Could not save image:\\n{exc}")
+            return
+        QMessageBox.information(self, "Image saved", f"Saved image to:\\n{path}")
 
     def inspect_device(self) -> None:
         item = self.device_list.currentItem()
