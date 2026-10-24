@@ -804,6 +804,10 @@ class DesktopWindow(QMainWindow):
             QPlainTextEdit { font-family: Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
             QTextBrowser#deviceReport { background: #141416; color: #ededf0; border: 1px solid #333339; border-radius: 6px; padding: 12px; font-size: 12px; }
             QTextBrowser#deviceReport { min-width: 0; }
+            QTextBrowser#deviceReport table { width: 100%; }
+            QTextBrowser#deviceReport td, QTextBrowser#deviceReport th { padding: 4px; }
+            QTextBrowser#deviceReport pre { white-space: pre-wrap; }
+            QTextBrowser#deviceReport p { margin-top: 4px; margin-bottom: 6px; }
             QTextBrowser#deviceReport h1, QTextBrowser#deviceReport h2 { color: #f0f0f4; }
             QTextBrowser#deviceReport a { color: #75cfc1; }
             QPushButton { background: #202023; color: #dedee4; border: 1px solid #34343a; border-radius: 6px; padding: 9px 15px; font-weight: 600; }
