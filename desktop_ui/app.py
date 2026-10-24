@@ -12,7 +12,7 @@ from pathlib import Path
 
 from desktop_ui.readiness_summary import summarize_readiness_report
 
-from PySide6.QtCore import QProcess, Qt
+from PySide6.QtCore import QProcess, Qt, QTimer
 from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel,
@@ -295,7 +295,7 @@ class DesktopWindow(QMainWindow):
         # Tile clicks automatically start inspection without a second click.
         QTimer.singleShot(0, lambda: self.inspect_dashboard_device(auto=True))
 
-    def inspect_dashboard_device(self) -> None:
+    def inspect_dashboard_device(self, auto: bool = False) -> None:
         serial = getattr(self, "selected_dashboard_serial", "")
         item = next(
             (self.device_list.item(i) for i in range(self.device_list.count())
@@ -1149,7 +1149,7 @@ class DesktopWindow(QMainWindow):
             return
         QMessageBox.information(self, "Image saved", f"Saved image to:\\n{path}")
 
-    def inspect_device(self) -> None:
+    def inspect_device(self, skip_confirmation: bool = False) -> None:
         item = self.device_list.currentItem()
         if not item:
             QMessageBox.information(self, "Select a device", "Click Refresh devices first.")
