@@ -137,6 +137,35 @@ def main(argv: list[str] | None = None) -> int:
         bootloader_unlock = detected.get("bootloader_unlock") or bootloader_unlock
     report = assess_device(manufacturer, model, ram_gb, codename,
         android_version, kernel_version, bootloader_unlock)
+    if live and live.get("status") == "OK":
+        detected = live.get("device", {})
+        extra = detected.get("extra_properties", {})
+        property_labels = {
+            "treble_enabled": ("android_treble_enabled", "ro.treble.enabled"),
+            "slot_suffix": ("boot_slot_suffix", "ro.boot.slot_suffix"),
+            "first_api_level": ("first_api_level", "ro.product.first_api_level"),
+            "oem_unlock_supported": ("oem_unlock_supported_property", "ro.oem_unlock_supported"),
+            "flash_locked": ("bootloader_flash_locked_property", "ro.boot.flash.locked"),
+            "product_name": ("android_product_name", "ro.product.name"),
+            "product_board": ("android_product_board", "ro.product.board"),
+            "board_platform": ("android_board_platform", "ro.board.platform"),
+            "build_incremental": ("android_build_incremental", "ro.build.version.incremental"),
+        }
+        for key, (label, prop_name) in property_labels.items():
+            value = extra.get(key)
+            report["findings"].append(asdict(Finding(
+                label, value, "UNKNOWN" if value is None else "CANDIDATE",
+                f"Read-only ADB property {prop_name}; device-reported, not independently verified.",
+                "Use as a compatibility clue; verify against device-specific sources."
+            )))
+        storage = detected.get("data_storage", {})
+        report["findings"].append(asdict(Finding(
+            "data_partition_storage",
+            {k: storage.get(k) for k in ("filesystem", "size", "used", "available", "use_percent")},
+            "UNKNOWN" if not storage.get("size") else "CANDIDATE",
+            "Read-only output of df -h /data; reports the mounted data filesystem only.",
+            "Check available space before any future build or installation steps."
+        )))
     report["physical_device_available"] = bool(live and live.get("status") == "OK")
     report["device_inspection"] = live or {"status": "NOT_RUN", "message": "Pass --inspect-device to query a connected phone.", "serial": None, "device": {}, "devices": []}
     if live and live.get("status") != "OK":
