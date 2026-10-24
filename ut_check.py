@@ -83,7 +83,24 @@ def render_markdown(report: dict[str, Any]) -> str:
     for item in report["findings"]:
         value = "Unknown" if item["value"] is None else str(item["value"])
         lines.append(f"| {safe(item['key'])} | {safe(value)} | {item['status']} | {safe(item['evidence'])} |")
-    lines.extend(["", "## How to interpret this report", "",
+    port_finding = next((item for item in report["findings"] if item["key"] == "existing_ubuntu_touch_port"), None)
+    if port_finding and port_finding["status"] == "VERIFIED" and port_finding["value"]:
+        compatibility_label = "Supported by evidence"
+        compatibility_detail = "A port is marked verified in the report evidence; review the cited device-specific sources before proceeding."
+    elif port_finding and port_finding["status"] == "BLOCKED":
+        compatibility_label = "Blocked by a known issue"
+        compatibility_detail = port_finding.get("next_step") or "Review the recorded blocker before proceeding."
+    elif port_finding and port_finding["status"] == "CANDIDATE":
+        compatibility_label = "Possible but unverified"
+        compatibility_detail = "A candidate port clue exists, but it is not verified for this exact device variant."
+    else:
+        compatibility_label = "Not enough information"
+        compatibility_detail = "No independently verified Ubuntu Touch port evidence is recorded for this exact device."
+    lines.extend(["", "## Compatibility summary", "",
+        f"- **Status:** {compatibility_label}",
+        f"- **Next step:** {compatibility_detail}",
+        "- This is an evidence summary, not a compatibility score or guarantee.", "",
+        "## How to interpret this report", "",
         "- **CANDIDATE:** a clue or user/device-reported value; not independently verified compatibility evidence.",
         "- **VERIFIED:** supported by cited, reviewed evidence for this exact device and variant.",
         "- **UNKNOWN:** evidence is missing; this is not proof of support or incompatibility.",
