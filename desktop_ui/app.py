@@ -767,6 +767,20 @@ class DesktopWindow(QMainWindow):
         self.nav.setCurrentRow(3)
         self.run_command(args, "ROM build")
 
+    def sync_dashboard_devices(self) -> None:
+        devices = []
+        for index in range(self.device_list.count()):
+            item = self.device_list.item(index)
+            serial = item.data(Qt.ItemDataRole.UserRole)
+            if not serial:
+                continue
+            devices.append({
+                "serial": serial,
+                "name": item.data(Qt.ItemDataRole.UserRole + 2) or serial,
+                "state": item.data(Qt.ItemDataRole.UserRole + 1) or "unknown",
+            })
+        self.render_dashboard_devices(devices)
+
     def refresh_devices(self) -> None:
         self.device_list.clear()
         self.device_count_label.setText("Scanning connected devices…")
@@ -780,6 +794,7 @@ class DesktopWindow(QMainWindow):
             if hasattr(self, "phone_check_status"):
                 self.phone_check_status.setText("ADB is not available")
                 self.phone_check_detail.setText("Install Android SDK Platform-Tools, ensure adb is on PATH, and click Scan for phones again.")
+            self.sync_dashboard_devices()
             return
         try:
             result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False)
@@ -792,6 +807,7 @@ class DesktopWindow(QMainWindow):
             if hasattr(self, "phone_check_status"):
                 self.phone_check_status.setText("Could not scan for phones")
                 self.phone_check_detail.setText(f"{exc}. Check the cable/ADB setup, then retry.")
+            self.sync_dashboard_devices()
             return
         device_items = []
         for raw in result.stdout.splitlines()[1:]:
@@ -837,6 +853,7 @@ class DesktopWindow(QMainWindow):
             if hasattr(self, "phone_check_status"):
                 self.phone_check_status.setText("Could not scan for phones")
                 self.phone_check_detail.setText(result.stderr.strip() or f"ADB exited with code {result.returncode}. Check ADB setup and retry.")
+            self.sync_dashboard_devices()
             return
         if not device_items:
             self.device_list.addItem("No devices detected")
@@ -875,6 +892,7 @@ class DesktopWindow(QMainWindow):
                 self.phone_check_detail.setText("Choose the intended phone and confirm its ADB state before inspection.")
         if result.stderr.strip():
             self.device_output.append("ADB stderr:\n" + result.stderr.strip())
+        self.sync_dashboard_devices()
 
     def update_selected_device_summary(self, current, previous=None) -> None:
         """Keep the summary tied to the currently selected device in multi-device setups."""
@@ -1065,7 +1083,11 @@ class DesktopWindow(QMainWindow):
             f"Saving report to: {self.device_report_path}\n"
             "Waiting for the inspection command to finish..."
         )
-        self.nav.setCurrentRow(4)
+        if getattr(self, "selected_dashboard_serial", None) == serial:
+            self.pages.setCurrentWidget(self.device_detail)
+            self.home_button.setVisible(True)
+        else:
+            self.nav.setCurrentRow(4)
         self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(self.device_report_path)], "Device inspection")
 
     def choose_workdir(self) -> None:
@@ -1103,8 +1125,11 @@ class DesktopWindow(QMainWindow):
                     self.last_device_report = report
                     self.device_output.setMarkdown(report)
                     self.phone_technical_report.setMarkdown(report)
+                    self.detail_device_report.setMarkdown(report)
                     summary = summarize_readiness_report(report, code)
                     self.device_summary.setText(summary)
+                    self.detail_device_summary.setText(summary)
+                    self.detail_device_status.setText("Inspection complete" if code == 0 else f"Inspection finished with exit code {code}")
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
                     if self.guided_inspection:
                         self.phone_check_status.setText("Inspection complete" if code == 0 else "Inspection needs review")
