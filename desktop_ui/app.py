@@ -345,30 +345,15 @@ class DesktopWindow(QMainWindow):
         guidance.setWordWrap(True)
         detail_box.addWidget(guidance)
         steps = QLabel(
-            "<b>First time? Follow these steps:</b><br>"
-            "1. Connect your phone with a USB data cable.<br>"
-            "2. On Android, enable Developer options and USB debugging if needed.<br>"
-            "3. Unlock the phone and accept the USB debugging authorization prompt.<br>"
-            "4. Click Refresh devices and select the intended phone. If more than one appears, "
-            "choose by model and serial number.<br>"
-            "5. Click Inspect selected device and confirm the read-only check.<br><br>"
-            "<b>What the result means:</b> A detected phone is not proof that Ubuntu Touch supports it. "
-            "Unknown means evidence is missing, not that the phone is supported or unsupported. "
-            "Bootloader lock state and permission to unlock are different things."
+            "<b>Getting started</b> · Connect with a USB data cable, enable USB debugging, "
+            "unlock the phone and accept its authorization prompt. Then refresh devices and inspect the selected phone.<br><br>"
+            "<b>Read results carefully:</b> detection does not mean Ubuntu Touch is supported. "
+            "<i>Unknown</i> means evidence is missing. A locked bootloader does not by itself tell us whether unlocking is allowed."
         )
         steps.setObjectName("notice")
         steps.setWordWrap(True)
+        steps.setMaximumHeight(76)
         detail_box.addWidget(steps)
-        glossary = QLabel(
-            "<b>Quick glossary</b> · <b>ADB</b>: Android Debug Bridge, used to communicate with a phone. "
-            "<b>ROM</b>: the operating system software image. <b>Codename</b>: the device identifier used by "
-            "development projects. <b>Bootloader</b>: starts the operating system and may enforce boot security. "
-            "<b>Recovery</b>: a separate maintenance environment. <b>Flashing</b>: writing software images to device storage. "
-            "<b>Vendor blobs</b>: proprietary device components. <b>Kernel</b>: the core that connects software to hardware."
-        )
-        glossary.setObjectName("muted")
-        glossary.setWordWrap(True)
-        detail_box.addWidget(glossary)
         self.device_image = QLabel("No device image loaded")
         self.device_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.device_image.setMinimumHeight(100)
@@ -390,7 +375,7 @@ class DesktopWindow(QMainWindow):
         image_heading.setObjectName("muted")
         detail_box.addWidget(image_heading)
         detail_box.addWidget(self.device_image)
-        self.device_image_source.setMaximumHeight(48)
+        self.device_image_source.setMaximumHeight(38)
         detail_box.addWidget(self.device_image_source)
         detail_box.addLayout(image_actions)
         self.device_image_data: bytes | None = None
@@ -400,7 +385,7 @@ class DesktopWindow(QMainWindow):
         self.device_output.setObjectName("deviceReport")
         self.device_output.setPlaceholderText("Inspect a selected phone to view its report.")
         self.device_output.setMinimumWidth(0)
-        detail_box.addWidget(self.device_output, 1)
+        self.device_output.setFont(QFont("Segoe UI" if sys.platform == "win32" else "Noto Sans", 11))\n        detail_box.addWidget(self.device_output, 2)
         report_actions = QHBoxLayout()
         copy_report = make_button("Copy report")
         copy_report.clicked.connect(self.copy_device_report)
@@ -874,12 +859,12 @@ class DesktopWindow(QMainWindow):
             QComboBox QAbstractItemView { background: #202024; color: #ededf0; selection-background-color: #6336a6; }
             QCheckBox { spacing: 8px; color: #d6d6dc; }
             QPlainTextEdit { font-family: Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
-            QTextBrowser#deviceReport { background: #141416; color: #ededf0; border: 1px solid #333339; border-radius: 6px; padding: 12px; font-size: 12px; }
+            QTextBrowser#deviceReport { background: #18181c; color: #f0f0f4; border: 1px solid #3a3a43; border-radius: 6px; padding: 14px; font-size: 14px; selection-background-color: #6336a6; }
             QTextBrowser#deviceReport { min-width: 0; }
             QTextBrowser#deviceReport table { width: 100%; }
-            QTextBrowser#deviceReport td, QTextBrowser#deviceReport th { padding: 4px; }
+            QTextBrowser#deviceReport td, QTextBrowser#deviceReport th { padding: 6px 8px; }
             QTextBrowser#deviceReport pre { white-space: pre-wrap; }
-            QTextBrowser#deviceReport p { margin-top: 4px; margin-bottom: 6px; }
+            QTextBrowser#deviceReport p { margin-top: 5px; margin-bottom: 8px; line-height: 1.35; }\n            QTextBrowser#deviceReport li { margin-bottom: 4px; }
             QTextBrowser#deviceReport h1, QTextBrowser#deviceReport h2 { color: #f0f0f4; }
             QTextBrowser#deviceReport a { color: #75cfc1; }
             QPushButton { background: #202023; color: #dedee4; border: 1px solid #34343a; border-radius: 6px; padding: 9px 15px; font-weight: 600; }
