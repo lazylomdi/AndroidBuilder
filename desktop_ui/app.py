@@ -400,9 +400,12 @@ class DesktopWindow(QMainWindow):
             if self.device_list.item(index).data(Qt.ItemDataRole.UserRole)
         ]
         ready = [item for item in selected if item.data(Qt.ItemDataRole.UserRole + 1) == "device"]
+        # Keep the beginner workflow active even when the user must select a
+        # device in Device Manager first. Its Inspect button then returns here
+        # with the result instead of silently switching to the advanced screen.
+        self.guided_inspection = True
         if len(selected) == 1 and len(ready) == 1:
             self.device_list.setCurrentItem(ready[0])
-            self.guided_inspection = True
             self.nav.setCurrentRow(4)
             self.inspect_device()
             return
