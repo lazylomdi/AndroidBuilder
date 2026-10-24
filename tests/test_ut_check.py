@@ -22,6 +22,9 @@ class ReadinessTests(unittest.TestCase):
         text = ut_check.render_markdown(ut_check.assess_device("Sony", "Xperia R1", 2.0))
         self.assertIn("No functional Ubuntu Touch port is established", text)
         self.assertIn("Physical device available", text)
+        self.assertIn("## Compatibility summary", text)
+        self.assertIn("Not enough information", text)
+        self.assertIn("No independently verified Ubuntu Touch port evidence", text)
 
     def test_cli_writes_json_and_markdown(self):
         with tempfile.TemporaryDirectory() as temp:
