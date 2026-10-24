@@ -109,6 +109,8 @@ def inspect_device(serial: str | None = None, adb_path: str | None = None,
         "product_board": props.get("ro.product.board") or None,
         "board_platform": props.get("ro.board.platform") or None,
         "build_incremental": props.get("ro.build.version.incremental") or None,
+        "verified_boot_state": props.get("ro.boot.verifiedbootstate") or None,
+        "vbmeta_device_state": props.get("ro.boot.vbmeta.device_state") or None,
     }
     try:
         storage_result = _run([executable, "-s", serial, "shell", "df", "-h", "/data"], timeout=timeout)
@@ -134,6 +136,17 @@ def inspect_device(serial: str | None = None, adb_path: str | None = None,
         "build_fingerprint": props.get("ro.build.fingerprint"),
         "cpu_abi": props.get("ro.product.cpu.abi"),
         "bootloader_unlock": None,
+        "bootloader_assessment": {
+            "current_state": (
+                "LOCKED (device-reported)" if extra_properties.get("flash_locked") == "1"
+                else "UNLOCKED (device-reported)" if extra_properties.get("flash_locked") == "0"
+                else "UNKNOWN"
+            ),
+            "oem_unlock_supported": extra_properties.get("oem_unlock_supported"),
+            "verified_boot_state": extra_properties.get("verified_boot_state"),
+            "vbmeta_device_state": extra_properties.get("vbmeta_device_state"),
+            "evidence": "Read-only Android properties; may be absent or vendor-specific and are not definitive on every device."
+        },
         "extra_properties": extra_properties,
         "data_storage": storage_data,
     }
@@ -145,7 +158,7 @@ def inspect_device(serial: str | None = None, adb_path: str | None = None,
         "devices": devices,
         "limitations": [
             "ADB properties may be absent, vendor-specific, or inaccurate.",
-            "Bootloader unlock eligibility/status is not inferred from these properties.",
+            "Bootloader unlock eligibility is separate from current lock state; ADB properties are clues only and may be absent or vendor-specific.",
             "No kernel/device-tree source validation, build, boot, or hardware test was performed.",
             "No device files or settings were changed."
         ]
