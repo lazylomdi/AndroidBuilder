@@ -12,7 +12,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMessageBox, QPlainTextEdit,
-    QProgressBar, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QSplitter,
+    QProgressBar, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QSplitter, QTextBrowser,
     QWidget, QFileDialog, QCheckBox, QGroupBox,
 )
 
@@ -290,8 +290,10 @@ class DesktopWindow(QMainWindow):
             "Refresh lists ADB devices. Inspection invokes the existing opt-in readiness command and is read-only. "
             "It does not unlock, root, reboot, erase, or flash the phone."
         ))
-        self.device_output = QPlainTextEdit()
+        self.device_output = QTextBrowser()
         self.device_output.setReadOnly(True)
+        self.device_output.setOpenExternalLinks(False)
+        self.device_output.setObjectName("deviceReport")
         self.device_output.setPlaceholderText("Device command output appears here.")
         detail_box.addWidget(self.device_output, 1)
         splitter.addWidget(details)
@@ -506,20 +508,20 @@ class DesktopWindow(QMainWindow):
         data = bytes(self.process.readAllStandardOutput()).decode(errors="replace")
         if data:
             self.log.appendPlainText(data.rstrip())
-            self.device_output.appendPlainText(data.rstrip())
+            self.device_output.append(data.rstrip())
 
     def read_stderr(self) -> None:
         data = bytes(self.process.readAllStandardError()).decode(errors="replace")
         if data:
             self.log.appendPlainText(data.rstrip())
-            self.device_output.appendPlainText(data.rstrip())
+            self.device_output.append(data.rstrip())
 
     def process_finished(self, code: int, _status: QProcess.ExitStatus) -> None:
         self.progress.setVisible(False)
         self.cancel_button.setEnabled(False)
         self.build_status.setText("Completed successfully" if code == 0 else f"Finished with exit code {code}")
         self.log.appendPlainText(f"\n[Process exited with code {code}]")
-        self.device_output.appendPlainText(f"\n[Process exited with code {code}]")
+        self.device_output.append(f"[Process exited with code {code}]")
         task = self.active_task
         self.active_task = ""
         self.refresh_environment()
@@ -530,13 +532,13 @@ class DesktopWindow(QMainWindow):
             if self.device_report_path is not None and self.device_report_path.is_file():
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
-                    self.device_output.setPlainText(report)
+                    self.device_output.setMarkdown(report)
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
                 except OSError as exc:
-                    self.device_output.appendPlainText(f"\nCould not read readiness report: {exc}")
+                    self.device_output.append(f"Could not read readiness report: {exc}")
             else:
-                self.device_output.appendPlainText(
-                    f"\nInspection exited with code {code}, but no report was created. "
+                self.device_output.append(
+                    f"Inspection exited with code {code}, but no report was created. "
                     "See Build monitor for stdout/stderr."
                 )
     def process_error(self, _error: QProcess.ProcessError) -> None:
@@ -584,6 +586,9 @@ class DesktopWindow(QMainWindow):
             QComboBox QAbstractItemView { background: #202024; color: #ededf0; selection-background-color: #6336a6; }
             QCheckBox { spacing: 8px; color: #d6d6dc; }
             QPlainTextEdit { font-family: Consolas, 'DejaVu Sans Mono', monospace; font-size: 12px; }
+            QTextBrowser#deviceReport { background: #141416; color: #ededf0; border: 1px solid #333339; border-radius: 6px; padding: 12px; font-size: 12px; }
+            QTextBrowser#deviceReport h1, QTextBrowser#deviceReport h2 { color: #f0f0f4; }
+            QTextBrowser#deviceReport a { color: #75cfc1; }
             QPushButton { background: #202023; color: #dedee4; border: 1px solid #34343a; border-radius: 6px; padding: 9px 15px; font-weight: 600; }
             QPushButton:hover { background: #2a2a30; border-color: #4b4b55; }
             QPushButton#primaryButton { background: #6550a8; color: white; border-color: #8068ce; }
