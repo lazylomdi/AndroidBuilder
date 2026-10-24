@@ -276,13 +276,16 @@ class DesktopWindow(QMainWindow):
             state = item.data(Qt.ItemDataRole.UserRole + 1) or "unknown"
             self.detail_device_name.setText(name)
             self.detail_device_serial.setText(f"Serial: {serial} · ADB state: {state}")
-            self.detail_device_summary.setText("Device selected. Run a read-only inspection to load its technical summary.")
+            self.detail_device_summary.setText("Device selected. Starting a read-only inspection to load its technical summary…")
             self.detail_device_report.setMarkdown(self.last_device_report if self.last_device_report else "")
         self.pages.setCurrentWidget(self.device_detail)
         self.page_title.setText("Device details")
         self.page_subtitle.setText("Technical summary and read-only inspection results for the selected phone.")
         self.home_button.setVisible(True)
         self.nav.clearSelection()
+        # A tile click should immediately load fresh details; do not require a
+        # second click on the inspection button.
+        QTimer.singleShot(0, self.inspect_dashboard_device)
 
     def inspect_dashboard_device(self) -> None:
         serial = getattr(self, "selected_dashboard_serial", "")
