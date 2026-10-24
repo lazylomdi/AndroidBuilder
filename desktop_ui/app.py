@@ -81,7 +81,7 @@ class DesktopWindow(QMainWindow):
         subtitle.setObjectName("eyebrow")
         side.addWidget(subtitle)
         self.nav = QListWidget()
-        self.nav.addItems(["Dashboard", "Build wizard", "Build monitor", "Device manager"])
+        self.nav.addItems(["Dashboard", "Check my phone", "Build wizard", "Build monitor", "Device manager"])
         self.nav.setCurrentRow(0)
         self.nav.currentRowChanged.connect(self.change_page)
         side.addWidget(self.nav, 1)
@@ -120,10 +120,11 @@ class DesktopWindow(QMainWindow):
         layout.addWidget(content, 1)
 
         self.dashboard = self.make_dashboard()
+        self.phone_check = self.make_phone_check()
         self.wizard = self.make_wizard()
         self.monitor = self.make_monitor()
         self.devices = self.make_devices()
-        for page in (self.dashboard, self.wizard, self.monitor, self.devices):
+        for page in (self.dashboard, self.phone_check, self.wizard, self.monitor, self.devices):
             self.pages.addWidget(page)
 
         self.apply_styles()
@@ -133,9 +134,10 @@ class DesktopWindow(QMainWindow):
         self.pages.setCurrentIndex(index)
         titles = [
             ("Dashboard", "Your build environment at a glance."),
+            ("Check my phone", "A guided, read-only check of a connected Android phone."),
             ("Build wizard", "Configure a ROM build before launching it."),
             ("Build monitor", "Live output from the active or most recent task."),
-            ("Device manager", "Read-only ADB discovery and optional device inspection."),
+            ("Device manager", "Advanced device selection and technical inspection details."),
         ]
         self.page_title.setText(titles[index][0])
         self.page_subtitle.setText(titles[index][1])
@@ -181,7 +183,7 @@ class DesktopWindow(QMainWindow):
         check_phone = make_button("Check my phone", True)
         check_phone.clicked.connect(self.open_device_check)
         build = make_button("Start a build setup")
-        build.clicked.connect(lambda: self.nav.setCurrentRow(1))
+        build.clicked.connect(lambda: self.nav.setCurrentRow(2))
         actions.addWidget(check_phone)
         actions.addWidget(build)
         actions.addStretch()
@@ -313,9 +315,83 @@ class DesktopWindow(QMainWindow):
         return page
 
     def open_device_check(self) -> None:
-        """Guide a beginner to the read-only device discovery workflow."""
-        self.nav.setCurrentRow(3)
+        """Open the guided phone-check workflow, not the advanced device manager."""
+        self.nav.setCurrentRow(1)
         self.refresh_devices()
+
+    def make_phone_check(self) -> QWidget:
+        page = QWidget()
+        box = QVBoxLayout(page)
+        box.setSpacing(16)
+
+        intro = QFrame()
+        intro.setObjectName("heroCard")
+        intro_layout = QVBoxLayout(intro)
+        eyebrow = QLabel("DEVICE READINESS")
+        eyebrow.setObjectName("eyebrow")
+        title = QLabel("Let's check your phone.")
+        title.setObjectName("heroTitle")
+        description = QLabel(
+            "This guided check reads information exposed by Android Debug Bridge (ADB). "
+            "It does not unlock, root, reboot, erase, or flash your phone."
+        )
+        description.setObjectName("muted")
+        description.setWordWrap(True)
+        intro_layout.addWidget(eyebrow)
+        intro_layout.addWidget(title)
+        intro_layout.addWidget(description)
+        box.addWidget(intro)
+
+        status_card = QFrame()
+        status_card.setObjectName("card")
+        status_layout = QVBoxLayout(status_card)
+        status_heading = QLabel("STEP 1 · CONNECT")
+        status_heading.setObjectName("cardTitle")
+        self.phone_check_status = QLabel("Checking for connected phones…")
+        self.phone_check_status.setObjectName("sectionTitle")
+        self.phone_check_status.setWordWrap(True)
+        self.phone_check_detail = QLabel(
+            "Use a USB data cable, enable USB debugging, unlock your phone, and accept the authorization prompt."
+        )
+        self.phone_check_detail.setObjectName("muted")
+        self.phone_check_detail.setWordWrap(True)
+        status_layout.addWidget(status_heading)
+        status_layout.addWidget(self.phone_check_status)
+        status_layout.addWidget(self.phone_check_detail)
+        box.addWidget(status_card)
+
+        steps = QFrame()
+        steps.setObjectName("card")
+        steps_layout = QVBoxLayout(steps)
+        steps_title = QLabel("What happens next")
+        steps_title.setObjectName("sectionTitle")
+        steps_text = QLabel(
+            "1. Scan for connected phones.\n"
+            "2. Select the intended phone if more than one is connected.\n"
+            "3. Run a read-only inspection and review the compatibility evidence.\n\n"
+            "A detected phone is not proof that Ubuntu Touch supports it. Unknown means the evidence is incomplete."
+        )
+        steps_text.setObjectName("muted")
+        steps_text.setWordWrap(True)
+        steps_layout.addWidget(steps_title)
+        steps_layout.addWidget(steps_text)
+        box.addWidget(steps)
+
+        actions = QHBoxLayout()
+        scan = make_button("Scan for phones", True)
+        scan.clicked.connect(self.refresh_devices)
+        select = make_button("Choose phone and inspect")
+        select.clicked.connect(self.open_device_manager)
+        actions.addWidget(scan)
+        actions.addWidget(select)
+        actions.addStretch()
+        box.addLayout(actions)
+        box.addStretch()
+        return page
+
+    def open_device_manager(self) -> None:
+        """Open advanced device selection and inspection."""
+        self.nav.setCurrentRow(4)
 
     def make_devices(self) -> QWidget:
         page = QWidget()
@@ -497,7 +573,7 @@ class DesktopWindow(QMainWindow):
         if self.dry_run.isChecked():
             args.append("--dry-run")
         self.log.clear()
-        self.nav.setCurrentRow(2)
+        self.nav.setCurrentRow(3)
         self.run_command(args, "ROM build")
 
     def refresh_devices(self) -> None:
@@ -580,6 +656,23 @@ class DesktopWindow(QMainWindow):
                 self.sidebar_device_name.setText("Select a device")
                 self.sidebar_device_info.setText(f"{len(device_items)} devices detected. Choose the intended phone before inspection.")
                 self.device_output.setPlainText("Multiple devices detected. Select the phone you want to inspect; no device has been selected automatically.\\n\\n" + adb_help("multiple devices"))
+        if hasattr(self, "phone_check_status"):
+            if not adb:
+                self.phone_check_status.setText("ADB is not available")
+                self.phone_check_detail.setText("Install Android SDK Platform-Tools and ensure adb is on PATH, then scan again.")
+            elif result.returncode != 0:
+                self.phone_check_status.setText("Could not scan for phones")
+                self.phone_check_detail.setText(result.stderr.strip() or "Check the ADB installation and try again.")
+            elif not device_items:
+                self.phone_check_status.setText("No phone detected yet")
+                self.phone_check_detail.setText("Connect with a USB data cable, enable USB debugging, authorize this computer, then scan again.")
+            elif len(device_items) == 1 and device_items[0].data(Qt.ItemDataRole.UserRole + 1) == "device":
+                selected_name = device_items[0].data(Qt.ItemDataRole.UserRole + 2)
+                self.phone_check_status.setText(f"Phone detected: {selected_name}")
+                self.phone_check_detail.setText("ADB is authorized. Continue to run the read-only inspection and review evidence.")
+            else:
+                self.phone_check_status.setText(f"{len(device_items)} phones/devices found")
+                self.phone_check_detail.setText("Choose the intended phone and confirm its ADB state before inspection.")
         if result.stderr.strip():
             self.device_output.append("ADB stderr:\n" + result.stderr.strip())
 
@@ -771,7 +864,7 @@ class DesktopWindow(QMainWindow):
             f"Saving report to: {self.device_report_path}\n"
             "Waiting for the inspection command to finish..."
         )
-        self.nav.setCurrentRow(3)
+        self.nav.setCurrentRow(4)
         self.run_command([str(ROMFORGE), "ut-check", "--inspect-device", "--serial", serial, "--markdown-out", str(self.device_report_path)], "Device inspection")
 
     def choose_workdir(self) -> None:
