@@ -402,6 +402,44 @@ def main() -> None:
                   f"{'yes' if v.lineage_eol else 'no':<5} {note}")
         print()
 
+    elif sub == "preflight":
+        from preflight import run_preflight
+        ap = argparse.ArgumentParser(prog="romforge preflight",
+            description="Check build prerequisites without installing tools or starting a build.")
+        ap.add_argument("--workdir", default="./romforge-src")
+        ap.add_argument("--backend", default="local",
+                        choices=["local", "docker", "github-actions"])
+        ns = ap.parse_args(sys.argv[2:])
+        report = run_preflight(ns.workdir, ns.backend)
+        print(f"\nBuild preflight: {report['summary']}")
+        print(f"Backend: {report['backend']} · Work directory: {report['workdir']}")
+        for item in report["checks"]:
+            print(f"  [{item['status']}] {item['name']}: {item['detail']}")
+        print("\nThis is a host readiness check, not a device compatibility or bootability guarantee.")
+        if not report["ready"]:
+            sys.exit(2)
+
+    elif sub == "artifact-report":
+        from artifact_manifest import write_artifact_manifest
+        ap = argparse.ArgumentParser(prog="romforge artifact-report",
+            description="Record artifact metadata and a SHA-256 digest; does not test bootability.")
+        ap.add_argument("artifact", help="Path to an existing ROM/image artifact")
+        ap.add_argument("--output", default=None, help="Manifest output path (default: next to artifact)")
+        ap.add_argument("--codename", default=None)
+        ap.add_argument("--android-version", default=None)
+        ap.add_argument("--backend", choices=["local", "docker", "github-actions"], default=None)
+        ap.add_argument("--jobs", type=int, default=None)
+        ap.add_argument("--build-succeeded", action="store_true",
+                        help="Record that the build tool reported success; not a boot-test claim")
+        ns = ap.parse_args(sys.argv[2:])
+        configuration = {"jobs": ns.jobs} if ns.jobs is not None else {}
+        manifest = write_artifact_manifest(
+            ns.artifact, ns.output, codename=ns.codename,
+            android_version=ns.android_version, backend=ns.backend,
+            configuration=configuration, build_succeeded=ns.build_succeeded)
+        print(f"Artifact manifest written: {manifest}")
+        print("The manifest records a SHA-256 digest; it does not verify publisher authenticity or bootability.")
+
     elif sub == "status":
         from build_pipeline import load_state, print_state
         ap = argparse.ArgumentParser(prog="romforge status")

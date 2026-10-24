@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "policy": "Entries are evidence records, not automatic support claims. A device is supported only after exact-variant procedures and sources are reviewed.",
+  "devices": [
+    {
+      "manufacturer": "Sony",
+      "model": "Xperia R1",
+      "model_ids": [
+        "G2199"
+      ],
+      "codenames": [],
+      "status": "INVESTIGATING",
+      "ubuntu_touch_port": "UNKNOWN",
+      "bootloader_unlock": "UNKNOWN",
+      "kernel_source": null,
+      "device_tree": null,
+      "vendor_sources": [],
+      "installation_procedure": null,
+      "recovery_procedure": null,
+      "known_limitations": [
+        "No independently verified functional Ubuntu Touch port is recorded in this catalog.",
+        "Sony's product specification lists Android 7.0 at launch; the inspected handset reportedly runs Android 8.0 with Linux kernel 3.18.71. The exact firmware build and matching source must be identified.",
+        "Halium base cannot be selected from the chipset alone. Confirm the device's Android userspace, kernel source/configuration, partition layout, bootloader status, and availability of matching vendor blobs first."
+      ],
+      "evidence": [
+        {
+          "source": "Sony Xperia R1/R1 Plus official white paper",
+          "url": "https://www-support-downloads.sonymobile.com/g2299/whitepaper_EN_G2199_G2299.pdf",
+          "supports": "Model identity, Qualcomm MSM8937, launch OS and hardware specifications; Sony document names G2199/G2299.",
+          "reviewed": "2026-10-24"
+        },
+        {
+          "source": "UBports porting introduction",
+          "url": "https://docs.ubports.com/en/latest/porting/introduction/Intro.html",
+          "supports": "Port components, matching vendor blobs and Android/Halium version considerations.",
+          "reviewed": "2026-10-24"
+        }
+      ],
+      "last_reviewed": "2026-10-24",
+      "reviewer": "AndroidBuilder research checkpoint",
+      "architecture": "arm64 (published device ABI list includes arm64-v8a; verify live device)",
+      "required_android_base": null,
+      "platform": "Qualcomm MSM8937 / Snapdragon 430 (Sony product specification)"
+    },
+    {
+      "manufacturer": "Samsung",
+      "model": "Galaxy A04e",
+      "model_ids": [
+        "SM-A042F"
+      ],
+      "codenames": [
+        "a04e"
+      ],
+      "platform": "MediaTek MT6765 (device-reported; candidate)",
+      "status": "INVESTIGATING",
+      "ubuntu_touch_port": "UNKNOWN",
+      "bootloader_unlock": "UNKNOWN",
+      "kernel_source": null,
+      "device_tree": null,
+      "vendor_sources": [],
+      "installation_procedure": null,
+      "recovery_procedure": null,
+      "known_limitations": [
+        "ADB properties do not establish Ubuntu Touch compatibility.",
+        "No independently verified functional Ubuntu Touch port is recorded in this catalog."
+      ],
+      "evidence": [],
+      "last_reviewed": null,
+      "reviewer": null,
+      "architecture": null,
+      "required_android_base": null
+    }
+  ]
+}

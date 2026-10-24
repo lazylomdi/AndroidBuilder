@@ -56,10 +56,10 @@ def assess_device(manufacturer: str | None, model: str | None, ram_gb: float | N
         "findings": [asdict(f) for f in findings],
         "missing_core_information": missing_core,
         "limitations": [
-            "This report is based on user-supplied data and offline rules only.",
+            "Evidence sources are labeled per finding: user input, device-reported ADB properties, or independently verified external evidence.",
             "Repository existence does not prove that sources build or support hardware.",
             "Compilation does not prove bootability or working hardware features.",
-            "No device was connected, flashed, or physically tested."
+            "No device was flashed or functionally tested; a connected device may have been queried using read-only ADB commands."
         ]
     }
 
@@ -83,7 +83,30 @@ def render_markdown(report: dict[str, Any]) -> str:
     for item in report["findings"]:
         value = "Unknown" if item["value"] is None else str(item["value"])
         lines.append(f"| {safe(item['key'])} | {safe(value)} | {item['status']} | {safe(item['evidence'])} |")
-    lines.extend(["", "## Missing core information", ""])
+    port_finding = next((item for item in report["findings"] if item["key"] == "existing_ubuntu_touch_port"), None)
+    if port_finding and port_finding["status"] == "VERIFIED" and port_finding["value"]:
+        compatibility_label = "Supported by evidence"
+        compatibility_detail = "A port is marked verified in the report evidence; review the cited device-specific sources before proceeding."
+    elif port_finding and port_finding["status"] == "BLOCKED":
+        compatibility_label = "Blocked by a known issue"
+        compatibility_detail = port_finding.get("next_step") or "Review the recorded blocker before proceeding."
+    elif port_finding and port_finding["status"] == "CANDIDATE":
+        compatibility_label = "Possible but unverified"
+        compatibility_detail = "A candidate port clue exists, but it is not verified for this exact device variant."
+    else:
+        compatibility_label = "Not enough information"
+        compatibility_detail = "No independently verified Ubuntu Touch port evidence is recorded for this exact device."
+    lines.extend(["", "## Compatibility summary", "",
+        f"- **Status:** {compatibility_label}",
+        f"- **Next step:** {compatibility_detail}",
+        "- This is an evidence summary, not a compatibility score or guarantee.", "",
+        "## How to interpret this report", "",
+        "- **CANDIDATE:** a clue or user/device-reported value; not independently verified compatibility evidence.",
+        "- **VERIFIED:** supported by cited, reviewed evidence for this exact device and variant.",
+        "- **UNKNOWN:** evidence is missing; this is not proof of support or incompatibility.",
+        "- **BLOCKED:** a known requirement or blocker prevents the proposed workflow.",
+        "", "A connected device being detected only proves ADB communication. It does not prove that Ubuntu Touch is available or functional.",
+        "", "## Missing core information", ""])
     lines.extend([f"- `{key}`" for key in report["missing_core_information"]] or ["- None recorded by this rule set."])
     lines.extend(["", "## Limitations", ""])
     lines.extend(f"- {item}" for item in report["limitations"])
@@ -137,6 +160,67 @@ def main(argv: list[str] | None = None) -> int:
         bootloader_unlock = detected.get("bootloader_unlock") or bootloader_unlock
     report = assess_device(manufacturer, model, ram_gb, codename,
         android_version, kernel_version, bootloader_unlock)
+    if live and live.get("status") == "OK":
+        detected = live.get("device", {})
+        # Keep provenance aligned with the source of each value. A live ADB
+        # observation remains a candidate, not independently verified evidence.
+        observed_fields = {
+            "manufacturer": "manufacturer",
+            "model": "model",
+            "ram_gb": "ram_gb",
+            "codename": "codename",
+            "android_version": "android_version",
+            "kernel_version": "kernel_version",
+        }
+        findings_by_key = {item["key"]: item for item in report["findings"]}
+        for finding_key, device_key in observed_fields.items():
+            observed_value = detected.get(device_key)
+            finding = findings_by_key.get(finding_key)
+            if observed_value is not None and finding is not None and finding["value"] == observed_value:
+                finding["evidence"] = "Read-only ADB inspection; device-reported value, not independently verified."
+                finding["next_step"] = "Cross-check against authoritative device-specific documentation."
+        # Current lock state is not the same as permission or eligibility to unlock.
+        eligibility = findings_by_key.get("bootloader_unlock_eligibility")
+        if eligibility is not None:
+            eligibility["evidence"] = "Unknown: device-reported lock properties do not establish OEM unlock eligibility."
+            eligibility["next_step"] = "Verify the exact model/region's official unlock policy; do not infer eligibility from a single property."
+        extra = detected.get("extra_properties", {})
+        property_labels = {
+            "treble_enabled": ("android_treble_enabled", "ro.treble.enabled"),
+            "slot_suffix": ("boot_slot_suffix", "ro.boot.slot_suffix"),
+            "first_api_level": ("first_api_level", "ro.product.first_api_level"),
+            "oem_unlock_supported": ("oem_unlock_supported_property", "ro.oem_unlock_supported"),
+            "flash_locked": ("bootloader_flash_locked_property", "ro.boot.flash.locked"),
+            "product_name": ("android_product_name", "ro.product.name"),
+            "product_board": ("android_product_board", "ro.product.board"),
+            "board_platform": ("android_board_platform", "ro.board.platform"),
+            "build_incremental": ("android_build_incremental", "ro.build.version.incremental"),
+            "verified_boot_state": ("verified_boot_state", "ro.boot.verifiedbootstate"),
+            "vbmeta_device_state": ("vbmeta_device_state", "ro.boot.vbmeta.device_state"),
+        }
+        for key, (label, prop_name) in property_labels.items():
+            value = extra.get(key)
+            report["findings"].append(asdict(Finding(
+                label, value, "UNKNOWN" if value is None else "CANDIDATE",
+                f"Read-only ADB property {prop_name}; device-reported, not independently verified.",
+                "Use as a compatibility clue; verify against device-specific sources."
+            )))
+        boot = detected.get("bootloader_assessment", {})
+        report["findings"].append(asdict(Finding(
+            "bootloader_current_state",
+            boot.get("current_state", "UNKNOWN"),
+            "CANDIDATE" if boot.get("current_state", "UNKNOWN") != "UNKNOWN" else "UNKNOWN",
+            boot.get("evidence", "No reliable bootloader-state indicator was available."),
+            "Treat this as device-reported evidence only. Verify on-device and distinguish current lock state from OEM unlock eligibility."
+        )))
+        storage = detected.get("data_storage", {})
+        report["findings"].append(asdict(Finding(
+            "data_partition_storage",
+            {k: storage.get(k) for k in ("filesystem", "size", "used", "available", "use_percent")},
+            "UNKNOWN" if not storage.get("size") else "CANDIDATE",
+            "Read-only output of df -h /data; reports the mounted data filesystem only.",
+            "Check available space before any future build or installation steps."
+        )))
     report["physical_device_available"] = bool(live and live.get("status") == "OK")
     report["device_inspection"] = live or {"status": "NOT_RUN", "message": "Pass --inspect-device to query a connected phone.", "serial": None, "device": {}, "devices": []}
     if live and live.get("status") != "OK":
