@@ -590,7 +590,7 @@ class DesktopWindow(QMainWindow):
                 self.device_list.setCurrentRow(-1)
                 self.sidebar_device_name.setText("Select a device")
                 self.sidebar_device_info.setText(f"{len(device_items)} devices detected. Choose the intended phone before inspection.")
-                self.device_output.setPlainText("Multiple devices detected. Select the phone you want to inspect; no device has been selected automatically.")
+                self.device_output.setPlainText("Multiple devices detected. Select the phone you want to inspect; no device has been selected automatically.\\n\\n" + adb_help("multiple devices"))
         if result.stderr.strip():
             self.device_output.append("ADB stderr:\n" + result.stderr.strip())
 
