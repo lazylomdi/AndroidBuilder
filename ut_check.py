@@ -162,6 +162,28 @@ def main(argv: list[str] | None = None) -> int:
         android_version, kernel_version, bootloader_unlock)
     if live and live.get("status") == "OK":
         detected = live.get("device", {})
+        # Keep provenance aligned with the source of each value. A live ADB
+        # observation remains a candidate, not independently verified evidence.
+        observed_fields = {
+            "manufacturer": "manufacturer",
+            "model": "model",
+            "ram_gb": "ram_gb",
+            "codename": "codename",
+            "android_version": "android_version",
+            "kernel_version": "kernel_version",
+        }
+        findings_by_key = {item["key"]: item for item in report["findings"]}
+        for finding_key, device_key in observed_fields.items():
+            observed_value = detected.get(device_key)
+            finding = findings_by_key.get(finding_key)
+            if observed_value is not None and finding is not None and finding["value"] == observed_value:
+                finding["evidence"] = "Read-only ADB inspection; device-reported value, not independently verified."
+                finding["next_step"] = "Cross-check against authoritative device-specific documentation."
+        # Current lock state is not the same as permission or eligibility to unlock.
+        eligibility = findings_by_key.get("bootloader_unlock_eligibility")
+        if eligibility is not None:
+            eligibility["evidence"] = "Unknown: device-reported lock properties do not establish OEM unlock eligibility."
+            eligibility["next_step"] = "Verify the exact model/region's official unlock policy; do not infer eligibility from a single property."
         extra = detected.get("extra_properties", {})
         property_labels = {
             "treble_enabled": ("android_treble_enabled", "ro.treble.enabled"),
