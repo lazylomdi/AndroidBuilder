@@ -65,6 +65,7 @@ class DesktopWindow(QMainWindow):
         self.build_running = False
         self.device_report_path: Path | None = None
         self.active_task = ""
+        self.guided_inspection = False
 
         root = QWidget()
         layout = QHBoxLayout(root)
@@ -401,6 +402,7 @@ class DesktopWindow(QMainWindow):
         ready = [item for item in selected if item.data(Qt.ItemDataRole.UserRole + 1) == "device"]
         if len(selected) == 1 and len(ready) == 1:
             self.device_list.setCurrentItem(ready[0])
+            self.guided_inspection = True
             self.nav.setCurrentRow(4)
             self.inspect_device()
             return
@@ -948,15 +950,28 @@ class DesktopWindow(QMainWindow):
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
                     self.device_output.setMarkdown(report)
-                    self.device_summary.setText(summarize_readiness_report(report, code))
+                    summary = summarize_readiness_report(report, code)
+                    self.device_summary.setText(summary)
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
+                    if self.guided_inspection:
+                        self.phone_check_status.setText("Inspection complete" if code == 0 else "Inspection needs review")
+                        self.phone_check_detail.setText(summary)
+                        self.nav.setCurrentRow(1)
                 except OSError as exc:
                     self.device_output.append(f"Could not read readiness report: {exc}")
+                    if self.guided_inspection:
+                        self.phone_check_status.setText("Could not load inspection report")
+                        self.phone_check_detail.setText(f"{exc}. Open Device Manager for technical output.")
+                        self.nav.setCurrentRow(1)
             else:
-                self.device_output.append(
-                    f"Inspection exited with code {code}, but no report was created. "
-                    "See Build monitor for stdout/stderr."
-                )
+                error_summary = f"Inspection exited with code {code}, but no report was created. See Build monitor for stdout/stderr."
+                self.device_output.append(error_summary)
+                self.device_summary.setText(error_summary)
+                if self.guided_inspection:
+                    self.phone_check_status.setText("Inspection did not produce a report")
+                    self.phone_check_detail.setText(error_summary)
+                    self.nav.setCurrentRow(1)
+            self.guided_inspection = False
     def toggle_technical_details(self, expanded: bool) -> None:
         self.device_output.setVisible(expanded)
         self.report_actions_widget.setVisible(expanded)
