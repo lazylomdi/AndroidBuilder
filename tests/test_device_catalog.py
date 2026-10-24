@@ -19,6 +19,21 @@ class DeviceCatalogTests(unittest.TestCase):
             self.assertIsNone(by_model[model]["installation_procedure"])
             self.assertIsNone(by_model[model]["recovery_procedure"])
 
+    def test_catalog_entries_follow_evidence_schema(self):
+        data = json.loads(CATALOG.read_text(encoding="utf-8"))
+        for device in data["devices"]:
+            self.assertIn("architecture", device)
+            self.assertIn("required_android_base", device)
+            self.assertIn("evidence", device)
+            for evidence in device["evidence"]:
+                for key in ("claim", "source_url", "source_type", "review_status", "checked_at", "notes"):
+                    self.assertIn(key, evidence)
+                self.assertIn(evidence["review_status"], {"UNREVIEWED", "REVIEWED", "REJECTED"})
+            if device["status"] == "SUPPORTED":
+                self.assertIsNotNone(device["installation_procedure"])
+                self.assertIsNotNone(device["recovery_procedure"])
+                self.assertTrue(any(e["review_status"] == "REVIEWED" for e in device["evidence"]))
+
     def test_catalog_does_not_claim_support_without_evidence(self):
         data = json.loads(CATALOG.read_text(encoding="utf-8"))
         for device in data["devices"]:
