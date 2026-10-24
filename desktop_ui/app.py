@@ -513,6 +513,15 @@ class DesktopWindow(QMainWindow):
             item.setData(Qt.ItemDataRole.UserRole + 1, state)
             item.setData(Qt.ItemDataRole.UserRole + 2, display_name)
             device_items.append(item)
+        if result.returncode != 0:
+            self.device_count_label.setText("Device scan failed — see Build monitor")
+            self.sidebar_device_name.setText("ADB error")
+            self.sidebar_device_info.setText(result.stderr.strip() or "adb devices returned a non-zero exit code.")
+            self.device_output.setPlainText(
+                "ADB could not list devices. Check the platform-tools installation and ADB server, then refresh.\n\n"
+                + (result.stderr.strip() or f"ADB exited with code {result.returncode}.")
+            )
+            return
         if not device_items:
             self.device_list.addItem("No devices detected")
             self.sidebar_device_name.setText("No device detected")
@@ -520,25 +529,19 @@ class DesktopWindow(QMainWindow):
             self.device_output.setPlainText("No ADB devices found. Connect one or more phones, enable USB debugging, accept authorization prompts, then refresh.")
             self.device_count_label.setText("0 devices detected")
         else:
-            selected = next((item for item in device_items if item.data(Qt.ItemDataRole.UserRole + 1) == "device"), device_items[0])
-            self.device_list.setCurrentItem(selected)
             ready_count = sum(1 for entry in device_items if entry.data(Qt.ItemDataRole.UserRole + 1) == "device")
             unauthorized_count = sum(1 for entry in device_items if entry.data(Qt.ItemDataRole.UserRole + 1) == "unauthorized")
-            self.device_count_label.setText(f"{len(device_items)} device(s) detected · {ready_count} ready · {unauthorized_count} awaiting authorization. Select a device before inspecting.")
-            serial = selected.data(Qt.ItemDataRole.UserRole)
-            state = selected.data(Qt.ItemDataRole.UserRole + 1)
-            display_name = selected.data(Qt.ItemDataRole.UserRole + 2) or serial
-            self.sidebar_device_name.setText(display_name)
-            self.sidebar_device_info.setText(f"Serial: {serial} · ADB: {state} · {len(device_items)} device(s)")
-            if state == "device":
-                self.device_output.setPlainText(
-                    f"Connected device: {display_name}\nSerial: {serial}\n"
-                    "Device selected automatically. Click Inspect selected device for read-only inspection."
-                )
+            self.device_count_label.setText(f"{len(device_items)} device(s) detected · {ready_count} ready · {unauthorized_count} awaiting authorization.")
+            # Never silently choose a phone when multiple devices are connected.
+            if len(device_items) == 1:
+                self.device_list.setCurrentItem(device_items[0])
             else:
-                self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
+                self.device_list.setCurrentRow(-1)
+                self.sidebar_device_name.setText("Select a device")
+                self.sidebar_device_info.setText(f"{len(device_items)} devices detected. Choose the intended phone before inspection.")
+                self.device_output.setPlainText("Multiple devices detected. Select the phone you want to inspect; no device has been selected automatically.")
         if result.stderr.strip():
-            self.device_output.append("ADB stderr:<br>" + result.stderr.strip().replace("\n", "<br>"))
+            self.device_output.append("ADB stderr:\n" + result.stderr.strip())
 
     def update_selected_device_summary(self, current, previous=None) -> None:
         """Keep the summary tied to the currently selected device in multi-device setups."""
