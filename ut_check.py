@@ -150,6 +150,8 @@ def main(argv: list[str] | None = None) -> int:
             "product_board": ("android_product_board", "ro.product.board"),
             "board_platform": ("android_board_platform", "ro.board.platform"),
             "build_incremental": ("android_build_incremental", "ro.build.version.incremental"),
+            "verified_boot_state": ("verified_boot_state", "ro.boot.verifiedbootstate"),
+            "vbmeta_device_state": ("vbmeta_device_state", "ro.boot.vbmeta.device_state"),
         }
         for key, (label, prop_name) in property_labels.items():
             value = extra.get(key)
