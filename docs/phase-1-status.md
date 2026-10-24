@@ -6,7 +6,7 @@ This tracker records implementation status separately from verified test results
 
 ## Current estimate
 
-**Estimated implementation progress: 75–80%.** This is a qualitative scope estimate, not a test-coverage metric. Phase 1 remains open until the acceptance checks below are validated.
+**Implementation scope: feature-complete pending validation.** The beginner phone-check workflow, expandable technical report, and reduced-clutter device manager are implemented. Phase 1 is not formally complete until automated and hands-on acceptance checks pass. Do not interpret this status as a claim that tests have passed.
 
 ## Work completed or in place
 
