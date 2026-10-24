@@ -313,7 +313,6 @@ class DesktopWindow(QMainWindow):
         """Show connection instructions and a local dependency availability check."""
         checks = [
             ("Python", sys.executable if sys.executable else ""),
-            ("PySide6 desktop UI", sys.executable if sys.executable else ""),
             ("ROMForge CLI", str(ROMFORGE) if ROMFORGE.is_file() else ""),
             ("ADB / Android Platform-Tools", shutil.which("adb") or ""),
             ("Git", shutil.which("git") or ""),
