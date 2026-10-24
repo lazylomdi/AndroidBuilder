@@ -13,7 +13,7 @@ Usage: ./setup_ubuntu.sh [options]
 
 Default behavior only checks prerequisites and runs lightweight project checks.
 Options:
-  --install-tools        Install Git, Python venv/pip, ADB, curl, rsync, and tmux via apt
+  --install-tools        Install Git, Python, ADB, D-Bus and Qt/X11 runtime libraries via apt
   --install-build-deps   Also install common Android 13/14-era build packages via apt
   --install-python-deps  Create .venv and install requirements.txt
   --skip-tests           Skip unit tests
@@ -57,7 +57,10 @@ if (( INSTALL_TOOLS )); then
     exit 1
   fi
   sudo apt-get update
-  sudo apt-get install -y git python3 python3-pip python3-venv adb curl rsync tmux ca-certificates
+  sudo apt-get install -y git python3 python3-pip python3-venv adb curl rsync tmux ca-certificates \\
+    dbus dbus-x11 libdbus-1-3 libxcb-cursor0 libxcb-icccm4 libxcb-image0 \\
+    libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 \\
+    libxcb-xkb1 libxkbcommon-x11-0 libegl1 libgl1
 fi
 
 if (( INSTALL_BUILD_DEPS )); then
