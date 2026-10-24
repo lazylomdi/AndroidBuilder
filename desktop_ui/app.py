@@ -158,11 +158,14 @@ class DesktopWindow(QMainWindow):
         sb.addWidget(h)
         sb.addWidget(QLabel("Create a build configuration, watch command output, or inspect a connected phone."))
         actions = QHBoxLayout()
-        build = make_button("New build", True)
+        check_phone = make_button("Check my phone", True)
+        check_phone.clicked.connect(self.open_device_check)
+        build = make_button("New build")
         build.clicked.connect(lambda: self.nav.setCurrentRow(1))
         device = make_button("Refresh devices")
         device.clicked.connect(self.refresh_devices)
         device.clicked.connect(lambda: self.nav.setCurrentRow(3))
+        actions.addWidget(check_phone)
         actions.addWidget(build)
         actions.addWidget(device)
         actions.addStretch()
@@ -273,6 +276,11 @@ class DesktopWindow(QMainWindow):
         box.addLayout(actions)
         return page
 
+    def open_device_check(self) -> None:
+        """Guide a beginner to the read-only device discovery workflow."""
+        self.nav.setCurrentRow(3)
+        self.refresh_devices()
+
     def make_devices(self) -> QWidget:
         page = QWidget()
         box = QVBoxLayout(page)
@@ -300,6 +308,31 @@ class DesktopWindow(QMainWindow):
         guidance.setObjectName("muted")
         guidance.setWordWrap(True)
         detail_box.addWidget(guidance)
+        steps = QLabel(
+            "<b>First time? Follow these steps:</b><br>"
+            "1. Connect your phone with a USB data cable.<br>"
+            "2. On Android, enable Developer options and USB debugging if needed.<br>"
+            "3. Unlock the phone and accept the USB debugging authorization prompt.<br>"
+            "4. Click Refresh devices and select the intended phone. If more than one appears, "
+            "choose by model and serial number.<br>"
+            "5. Click Inspect selected device and confirm the read-only check.<br><br>"
+            "<b>What the result means:</b> A detected phone is not proof that Ubuntu Touch supports it. "
+            "Unknown means evidence is missing, not that the phone is supported or unsupported. "
+            "Bootloader lock state and permission to unlock are different things."
+        )
+        steps.setObjectName("notice")
+        steps.setWordWrap(True)
+        detail_box.addWidget(steps)
+        glossary = QLabel(
+            "<b>Quick glossary</b> · <b>ADB</b>: Android Debug Bridge, used to communicate with a phone. "
+            "<b>ROM</b>: the operating system software image. <b>Codename</b>: the device identifier used by "
+            "development projects. <b>Bootloader</b>: starts the operating system and may enforce boot security. "
+            "<b>Recovery</b>: a separate maintenance environment. <b>Flashing</b>: writing software images to device storage. "
+            "<b>Vendor blobs</b>: proprietary device components. <b>Kernel</b>: the core that connects software to hardware."
+        )
+        glossary.setObjectName("muted")
+        glossary.setWordWrap(True)
+        detail_box.addWidget(glossary)
         self.device_image = QLabel("No device image loaded")
         self.device_image.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.device_image.setMinimumHeight(100)
