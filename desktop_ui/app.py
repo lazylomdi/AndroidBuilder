@@ -381,13 +381,37 @@ class DesktopWindow(QMainWindow):
         scan = make_button("Scan for phones", True)
         scan.clicked.connect(self.refresh_devices)
         select = make_button("Choose phone and inspect")
-        select.clicked.connect(self.open_device_manager)
+        select.clicked.connect(self.continue_phone_check)
         actions.addWidget(scan)
         actions.addWidget(select)
         actions.addStretch()
         box.addLayout(actions)
         box.addStretch()
         return page
+
+    def continue_phone_check(self) -> None:
+        """Continue to inspection when exactly one authorized device is available."""
+        selected = [
+            self.device_list.item(index)
+            for index in range(self.device_list.count())
+            if self.device_list.item(index).data(Qt.ItemDataRole.UserRole)
+        ]
+        ready = [item for item in selected if item.data(Qt.ItemDataRole.UserRole + 1) == "device"]
+        if len(selected) == 1 and len(ready) == 1:
+            self.device_list.setCurrentItem(ready[0])
+            self.nav.setCurrentRow(4)
+            self.inspect_device()
+            return
+        self.open_device_manager()
+        if not selected:
+            self.phone_check_status.setText("No phone available to inspect")
+            self.phone_check_detail.setText("Scan again after connecting and authorizing a phone.")
+        elif len(selected) > 1:
+            self.phone_check_status.setText("Choose which phone to inspect")
+            self.phone_check_detail.setText("Several devices are connected. Select the exact model and serial number in Device Manager.")
+        else:
+            self.phone_check_status.setText("Phone needs attention before inspection")
+            self.phone_check_detail.setText("Resolve the ADB state shown in Device Manager, then scan again.")
 
     def open_device_manager(self) -> None:
         """Open advanced device selection and inspection."""
