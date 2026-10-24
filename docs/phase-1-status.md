@@ -17,12 +17,14 @@ This tracker records implementation status separately from verified test results
 - Compatibility summary in the report format, including conservative "Not enough information" handling.
 - Technical report copy/export controls.
 - Recent UI change: concise summary parser extracted into a Qt-independent module and detailed report hidden until requested.
+- Guided phone checks now return to the beginner screen with the inspection summary or an explicit report-load/failure message.
+- Fixed literal escaped newline rendering in the ADB-not-found, no-device, and multiple-device explanatory text.
 - Added unit tests for report-summary parsing.
 
 ## Remaining work
 
 - Validate summary parsing and UI integration with the full automated test suite.
-- Keep the guided phone-check workflow coherent after inspection, including clear feedback for zero, one, multiple, unauthorized, and offline devices.
+- Validate the guided phone-check return path after inspection, including clear feedback for zero, one, multiple, unauthorized, and offline devices.
 - Validate report copy/export and details toggle in a running desktop app.
 - Resolve or document any outstanding desktop runtime issues.
 - Test on supported Linux and Windows environments, or explicitly document untested platforms.
