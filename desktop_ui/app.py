@@ -514,7 +514,13 @@ class DesktopWindow(QMainWindow):
         self.build_status.setText("Completed successfully" if code == 0 else f"Finished with exit code {code}")
         self.log.appendPlainText(f"\n[Process exited with code {code}]")
         self.device_output.appendPlainText(f"\n[Process exited with code {code}]")
-        if self.active_task == "Device inspection":
+        task = self.active_task
+        self.active_task = ""
+        self.refresh_environment()
+        self.refresh_devices()
+        # Refreshing devices updates the connection summary; for an inspection,
+        # replace that summary with the completed report after the refresh.
+        if task == "Device inspection":
             if self.device_report_path is not None and self.device_report_path.is_file():
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
@@ -527,10 +533,6 @@ class DesktopWindow(QMainWindow):
                     f"\nInspection exited with code {code}, but no report was created. "
                     "See Build monitor for stdout/stderr."
                 )
-        self.active_task = ""
-        self.refresh_environment()
-        self.refresh_devices()
-
     def process_error(self, _error: QProcess.ProcessError) -> None:
         self.log.appendPlainText(f"Process error: {self.process.errorString()}")
         self.build_status.setText("Could not start process")
