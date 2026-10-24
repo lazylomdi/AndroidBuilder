@@ -56,10 +56,10 @@ def assess_device(manufacturer: str | None, model: str | None, ram_gb: float | N
         "findings": [asdict(f) for f in findings],
         "missing_core_information": missing_core,
         "limitations": [
-            "This report is based on user-supplied data and offline rules only.",
+            "Evidence sources are labeled per finding: user input, device-reported ADB properties, or independently verified external evidence.",
             "Repository existence does not prove that sources build or support hardware.",
             "Compilation does not prove bootability or working hardware features.",
-            "No device was connected, flashed, or physically tested."
+            "No device was flashed or functionally tested; a connected device may have been queried using read-only ADB commands."
         ]
     }
 
@@ -83,7 +83,13 @@ def render_markdown(report: dict[str, Any]) -> str:
     for item in report["findings"]:
         value = "Unknown" if item["value"] is None else str(item["value"])
         lines.append(f"| {safe(item['key'])} | {safe(value)} | {item['status']} | {safe(item['evidence'])} |")
-    lines.extend(["", "## Missing core information", ""])
+    lines.extend(["", "## How to interpret this report", "",
+        "- **CANDIDATE:** a clue or user/device-reported value; not independently verified compatibility evidence.",
+        "- **VERIFIED:** supported by cited, reviewed evidence for this exact device and variant.",
+        "- **UNKNOWN:** evidence is missing; this is not proof of support or incompatibility.",
+        "- **BLOCKED:** a known requirement or blocker prevents the proposed workflow.",
+        "", "A connected device being detected only proves ADB communication. It does not prove that Ubuntu Touch is available or functional.",
+        "", "## Missing core information", ""])
     lines.extend([f"- `{key}`" for key in report["missing_core_information"]] or ["- None recorded by this rule set."])
     lines.extend(["", "## Limitations", ""])
     lines.extend(f"- {item}" for item in report["limitations"])
