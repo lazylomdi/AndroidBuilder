@@ -401,10 +401,30 @@ class DesktopWindow(QMainWindow):
             parts = line.split()
             serial = parts[0]
             state = parts[1] if len(parts) > 1 else "unknown"
-            self.device_list.addItem(line)
+            model = ""
+            manufacturer = ""
+            if state == "device":
+                try:
+                    model_result = subprocess.run(
+                        [adb, "-s", serial, "shell", "getprop", "ro.product.model"],
+                        capture_output=True, text=True, timeout=4, check=False,
+                    )
+                    model = model_result.stdout.strip() if model_result.returncode == 0 else ""
+                    maker_result = subprocess.run(
+                        [adb, "-s", serial, "shell", "getprop", "ro.product.manufacturer"],
+                        capture_output=True, text=True, timeout=4, check=False,
+                    )
+                    manufacturer = maker_result.stdout.strip() if maker_result.returncode == 0 else ""
+                except (OSError, subprocess.TimeoutExpired):
+                    pass
+            display_name = " ".join(part for part in (manufacturer, model) if part).strip()
+            if not display_name:
+                display_name = serial
+            self.device_list.addItem(f"{display_name}  ·  {serial}  ·  {state}")
             item = self.device_list.item(self.device_list.count() - 1)
             item.setData(Qt.ItemDataRole.UserRole, serial)
             item.setData(Qt.ItemDataRole.UserRole + 1, state)
+            item.setData(Qt.ItemDataRole.UserRole + 2, display_name)
             device_items.append(item)
         if not device_items:
             self.device_list.addItem("No devices detected")
@@ -416,10 +436,14 @@ class DesktopWindow(QMainWindow):
             self.device_list.setCurrentItem(selected)
             serial = selected.data(Qt.ItemDataRole.UserRole)
             state = selected.data(Qt.ItemDataRole.UserRole + 1)
-            self.sidebar_device_name.setText(serial)
-            self.sidebar_device_info.setText(f"ADB status: {state} · {len(device_items)} device(s) detected")
+            display_name = selected.data(Qt.ItemDataRole.UserRole + 2) or serial
+            self.sidebar_device_name.setText(display_name)
+            self.sidebar_device_info.setText(f"Serial: {serial} · ADB: {state} · {len(device_items)} device(s)")
             if state == "device":
-                self.device_output.setPlainText(f"Connected: {serial}\nDevice selected automatically. Click Inspect selected device for read-only inspection.")
+                self.device_output.setPlainText(
+                    f"Connected device: {display_name}\nSerial: {serial}\n"
+                    "Device selected automatically. Click Inspect selected device for read-only inspection."
+                )
             else:
                 self.device_output.setPlainText(f"ADB found {serial}, but its state is {state!r}. Resolve this before inspection.")
         if result.stderr.strip():
