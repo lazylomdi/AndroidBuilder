@@ -21,8 +21,8 @@ command -v git >/dev/null 2>&1 || fail "git is not installed"
 cd "$REPO_DIR"
 
 CURRENT_BRANCH="$(git branch --show-current)"
-[[ "$CURRENT_BRANCH" == "$BRANCH" ]] || fail \
-  "Currently on '$CURRENT_BRANCH', expected '$BRANCH'. Nothing updated."
+[[ -n "$CURRENT_BRANCH" ]] || fail "Detached HEAD detected. Switch to a branch before updating."
+log "Current local branch: $CURRENT_BRANCH; update source: origin/$BRANCH"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
