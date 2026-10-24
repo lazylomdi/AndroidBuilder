@@ -479,6 +479,10 @@ class DesktopWindow(QMainWindow):
         detail_box.addWidget(self.device_image_source)
         detail_box.addLayout(image_actions)
         self.device_image_data: bytes | None = None
+        self.device_summary = QLabel("No inspection results yet. Select an authorized phone and run the read-only check.")
+        self.device_summary.setObjectName("notice")
+        self.device_summary.setWordWrap(True)
+        detail_box.addWidget(self.device_summary)
         self.device_output = QTextBrowser()
         self.device_output.setReadOnly(True)
         self.device_output.setOpenExternalLinks(False)
@@ -880,6 +884,7 @@ class DesktopWindow(QMainWindow):
         if answer != QMessageBox.StandardButton.Yes:
             return
         self.device_output.clear()
+        self.device_summary.setText(f"Inspection running for {item.data(Qt.ItemDataRole.UserRole + 2) or serial}. This is a read-only check.")
         report_dir = Path.home() / ".local" / "share" / "AndroidBuilder"
         try:
             report_dir.mkdir(parents=True, exist_ok=True)
@@ -933,6 +938,7 @@ class DesktopWindow(QMainWindow):
                 try:
                     report = self.device_report_path.read_text(encoding="utf-8")
                     self.device_output.setMarkdown(report)
+                    self.device_summary.setText(self.summarize_readiness_report(report, code))
                     self.log.appendPlainText(f"Readiness report loaded from {self.device_report_path}")
                 except OSError as exc:
                     self.device_output.append(f"Could not read readiness report: {exc}")
@@ -941,6 +947,28 @@ class DesktopWindow(QMainWindow):
                     f"Inspection exited with code {code}, but no report was created. "
                     "See Build monitor for stdout/stderr."
                 )
+    @staticmethod
+    def summarize_readiness_report(report: str, exit_code: int = 0) -> str:
+        """Create a short plain-language summary without upgrading evidence status."""
+        lines = [line.strip() for line in report.splitlines() if line.strip()]
+        device_line = next(
+            (line for line in lines if any(key in line.lower() for key in ("manufacturer", "model", "codename")) and "|" in line),
+            "",
+        )
+        status_line = next(
+            (line for line in lines if "ubuntu touch" in line.lower() and any(word in line.lower() for word in ("unknown", "candidate", "verified", "blocked", "support"))),
+            "",
+        )
+        summary_parts = ["Inspection finished." if exit_code == 0 else f"Inspection finished with exit code {exit_code}."]
+        if device_line:
+            summary_parts.append(device_line.replace("|", " ·").strip("| "))
+        if status_line:
+            summary_parts.append(status_line.replace("|", " ·").strip("| "))
+        if not status_line:
+            summary_parts.append("Compatibility: not established by this report; review the findings below.")
+        summary_parts.append("ADB inspection is not proof of port support, bootability, or hardware functionality.")
+        return "\n".join(summary_parts)
+
     def process_error(self, _error: QProcess.ProcessError) -> None:
         self.log.appendPlainText(f"Process error: {self.process.errorString()}")
         self.build_status.setText("Could not start process")
