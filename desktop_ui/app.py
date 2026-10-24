@@ -12,7 +12,7 @@ from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QApplication, QComboBox, QFormLayout, QFrame, QHBoxLayout, QLabel,
     QLineEdit, QListWidget, QMainWindow, QMessageBox, QPlainTextEdit,
-    QProgressBar, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout,
+    QProgressBar, QPushButton, QSpinBox, QStackedWidget, QVBoxLayout, QSplitter,
     QWidget, QFileDialog, QCheckBox, QGroupBox,
 )
 
@@ -273,10 +273,13 @@ class DesktopWindow(QMainWindow):
     def make_devices(self) -> QWidget:
         page = QWidget()
         box = QVBoxLayout(page)
-        row = QHBoxLayout()
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setChildrenCollapsible(False)
         self.device_list = QListWidget()
+        self.device_list.setMinimumWidth(250)
         self.device_list.setMinimumHeight(240)
-        row.addWidget(self.device_list, 2)
+        self.device_list.setUniformItemSizes(True)
+        splitter.addWidget(self.device_list)
         details = QFrame()
         details.setObjectName("card")
         detail_box = QVBoxLayout(details)
@@ -291,8 +294,11 @@ class DesktopWindow(QMainWindow):
         self.device_output.setReadOnly(True)
         self.device_output.setPlaceholderText("Device command output appears here.")
         detail_box.addWidget(self.device_output, 1)
-        row.addWidget(details, 3)
-        box.addLayout(row, 1)
+        splitter.addWidget(details)
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setSizes([320, 760])
+        box.addWidget(splitter, 1)
         actions = QHBoxLayout()
         refresh = make_button("Refresh devices", True)
         refresh.clicked.connect(self.refresh_devices)
