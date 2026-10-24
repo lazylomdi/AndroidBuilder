@@ -586,6 +586,9 @@ class DesktopWindow(QMainWindow):
             self.sidebar_device_info.setText("Install Android platform tools, then refresh.")
             self.device_output.setPlainText("ADB was not found on PATH.\\n\\n" + adb_help("ADB not found"))
             self.device_count_label.setText("ADB unavailable — install Android Platform-Tools")
+            if hasattr(self, "phone_check_status"):
+                self.phone_check_status.setText("ADB is not available")
+                self.phone_check_detail.setText("Install Android SDK Platform-Tools, ensure adb is on PATH, and click Scan for phones again.")
             return
         try:
             result = subprocess.run([adb, "devices", "-l"], capture_output=True, text=True, timeout=8, check=False)
@@ -595,6 +598,9 @@ class DesktopWindow(QMainWindow):
             self.sidebar_device_info.setText(str(exc))
             self.device_output.setPlainText(f"Could not query ADB devices:\n{exc}")
             self.device_count_label.setText("Device scan failed — see details")
+            if hasattr(self, "phone_check_status"):
+                self.phone_check_status.setText("Could not scan for phones")
+                self.phone_check_detail.setText(f"{exc}. Check the cable/ADB setup, then retry.")
             return
         device_items = []
         for raw in result.stdout.splitlines()[1:]:
@@ -637,6 +643,9 @@ class DesktopWindow(QMainWindow):
                 "ADB could not list devices. Check the platform-tools installation and ADB server, then refresh.\n\n"
                 + (result.stderr.strip() or f"ADB exited with code {result.returncode}.")
             )
+            if hasattr(self, "phone_check_status"):
+                self.phone_check_status.setText("Could not scan for phones")
+                self.phone_check_detail.setText(result.stderr.strip() or f"ADB exited with code {result.returncode}. Check ADB setup and retry.")
             return
         if not device_items:
             self.device_list.addItem("No devices detected")
