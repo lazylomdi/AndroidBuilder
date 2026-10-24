@@ -115,9 +115,18 @@ class DesktopWindow(QMainWindow):
         content_layout.setSpacing(16)
         self.page_title = QLabel("Dashboard")
         self.page_title.setObjectName("pageTitle")
-        self.page_subtitle = QLabel("Your build environment at a glance.")
+        self.page_subtitle = QLabel("Your connected Android devices.")
         self.page_subtitle.setObjectName("muted")
-        content_layout.addWidget(self.page_title)
+        header_row = QHBoxLayout()
+        header_row.addWidget(self.page_title, 1)
+        self.home_button = make_button("⌂ Home")
+        self.home_button.clicked.connect(self.go_home)
+        self.home_button.setVisible(False)
+        header_row.addWidget(self.home_button)
+        self.help_button = make_button("? Help")
+        self.help_button.clicked.connect(self.show_help)
+        header_row.addWidget(self.help_button)
+        content_layout.addLayout(header_row)
         content_layout.addWidget(self.page_subtitle)
         self.pages = QStackedWidget()
         content_layout.addWidget(self.pages, 1)
@@ -128,7 +137,8 @@ class DesktopWindow(QMainWindow):
         self.wizard = self.make_wizard()
         self.monitor = self.make_monitor()
         self.devices = self.make_devices()
-        for page in (self.dashboard, self.phone_check, self.wizard, self.monitor, self.devices):
+        self.device_detail = self.make_device_detail()
+        for page in (self.dashboard, self.phone_check, self.wizard, self.monitor, self.devices, self.device_detail):
             self.pages.addWidget(page)
 
         self.apply_styles()
@@ -165,63 +175,168 @@ class DesktopWindow(QMainWindow):
     def make_dashboard(self) -> QWidget:
         page = QWidget()
         box = QVBoxLayout(page)
-        box.setSpacing(18)
-
-        hero = QFrame()
-        hero.setObjectName("heroCard")
-        hero_box = QVBoxLayout(hero)
-        eyebrow = QLabel("ROM WORKSPACE")
-        eyebrow.setObjectName("eyebrow")
-        title = QLabel("Build with confidence.")
-        title.setObjectName("heroTitle")
-        intro = QLabel(
-            "Prepare a ROM build or check what is currently known about your connected phone. "
-            "Device detection is not the same as operating-system support."
-        )
-        intro.setObjectName("muted")
-        intro.setWordWrap(True)
-        hero_box.addWidget(eyebrow)
-        hero_box.addWidget(title)
-        hero_box.addWidget(intro)
-        actions = QHBoxLayout()
-        check_phone = make_button("Check my phone", True)
-        check_phone.clicked.connect(self.open_device_check)
-        build = make_button("Start a build setup")
-        build.clicked.connect(lambda: self.nav.setCurrentRow(2))
-        actions.addWidget(check_phone)
-        actions.addWidget(build)
-        actions.addStretch()
-        hero_box.addLayout(actions)
-        box.addWidget(hero)
-
-        section = QLabel("WORKFLOWS")
-        section.setObjectName("eyebrow")
-        box.addWidget(section)
-        cards = QHBoxLayout()
-        device_card = self.card(
-            "DEVICE READINESS",
-            "Inspect a phone",
-            "Read-only ADB checks show device-reported details and highlight what still needs verification."
-        )
-        build_card = self.card(
-            "ROM BUILD",
-            "Configure a build",
-            "Review the target, source, backend, and disk requirements. The first run is a dry run."
-        )
-        cards.addWidget(device_card)
-        cards.addWidget(build_card)
-        box.addLayout(cards)
-
-        note = QLabel(
-            "Platform note: full Android ROM compilation is generally best run in a supported Ubuntu "
-            "environment (or Ubuntu under WSL2 on Windows). Python and Git are implementation prerequisites, "
-            "not project progress indicators."
-        )
-        note.setObjectName("notice")
-        note.setWordWrap(True)
-        box.addWidget(note)
+        box.setSpacing(16)
+        self.dashboard_hint = QLabel("Phones connected through Android Debug Bridge appear here.")
+        self.dashboard_hint.setObjectName("muted")
+        box.addWidget(self.dashboard_hint)
+        self.device_cards_widget = QWidget()
+        self.device_cards_layout = QHBoxLayout(self.device_cards_widget)
+        self.device_cards_layout.setContentsMargins(0, 0, 0, 0)
+        self.device_cards_layout.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+        box.addWidget(self.device_cards_widget)
+        self.dashboard_refresh_button = make_button("Refresh devices", True)
+        self.dashboard_refresh_button.clicked.connect(self.refresh_devices)
+        box.addWidget(self.dashboard_refresh_button, 0, Qt.AlignmentFlag.AlignLeft)
         box.addStretch()
         return page
+
+    def render_dashboard_devices(self, devices: list[dict[str, str]]) -> None:
+        while self.device_cards_layout.count():
+            item = self.device_cards_layout.takeAt(0)
+            widget = item.widget()
+            if widget:
+                widget.deleteLater()
+        if not devices:
+            empty = QLabel("No device connected")
+            empty.setObjectName("muted")
+            empty.setMinimumHeight(130)
+            empty.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.device_cards_layout.addWidget(empty)
+            self.dashboard_hint.setText("Connect a phone with USB debugging enabled, then refresh.")
+            return
+        self.dashboard_hint.setText(f"{len(devices)} connected device(s) · Select a phone to inspect it.")
+        for device in devices:
+            button = QPushButton()
+            button.setObjectName("deviceTile")
+            button.setCursor(Qt.CursorShape.PointingHandCursor)
+            button.setMinimumSize(150, 155)
+            button.setMaximumWidth(210)
+            tile = QVBoxLayout(button)
+            icon = QLabel("📱")
+            icon.setObjectName("phoneIcon")
+            icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name = QLabel(device["name"])
+            name.setObjectName("deviceTileName")
+            name.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            name.setWordWrap(True)
+            state = QLabel(device["state"])
+            state.setObjectName("muted")
+            state.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            tile.addWidget(icon, 1)
+            tile.addWidget(name)
+            tile.addWidget(state)
+            button.clicked.connect(lambda checked=False, serial=device["serial"]: self.open_device_detail(serial))
+            self.device_cards_layout.addWidget(button)
+
+    def make_device_detail(self) -> QWidget:
+        page = QWidget()
+        box = QVBoxLayout(page)
+        self.detail_device_name = QLabel("Select a connected phone")
+        self.detail_device_name.setObjectName("sectionTitle")
+        self.detail_device_serial = QLabel("")
+        self.detail_device_serial.setObjectName("muted")
+        box.addWidget(self.detail_device_name)
+        box.addWidget(self.detail_device_serial)
+        self.detail_device_summary = QLabel("Select a phone on the dashboard to inspect its reported details.")
+        self.detail_device_summary.setObjectName("notice")
+        self.detail_device_summary.setWordWrap(True)
+        box.addWidget(self.detail_device_summary)
+        self.detail_device_status = QLabel("Technical report")
+        self.detail_device_status.setObjectName("sectionTitle")
+        box.addWidget(self.detail_device_status)
+        self.detail_device_report = QTextBrowser()
+        self.detail_device_report.setObjectName("deviceReport")
+        self.detail_device_report.setOpenExternalLinks(False)
+        self.detail_device_report.setPlaceholderText("The detailed device report will appear here after inspection.")
+        box.addWidget(self.detail_device_report, 1)
+        actions = QHBoxLayout()
+        self.detail_inspect_button = make_button("Inspect / refresh details", True)
+        self.detail_inspect_button.clicked.connect(self.inspect_dashboard_device)
+        actions.addWidget(self.detail_inspect_button)
+        actions.addStretch()
+        box.addLayout(actions)
+        return page
+
+    def open_device_detail(self, serial: str) -> None:
+        """Open a dedicated detail page for the explicitly selected dashboard device."""
+        self.selected_dashboard_serial = serial
+        item = next(
+            (self.device_list.item(i) for i in range(self.device_list.count())
+             if self.device_list.item(i).data(Qt.ItemDataRole.UserRole) == serial),
+            None,
+        )
+        if item is None:
+            self.detail_device_name.setText("Device no longer detected")
+            self.detail_device_serial.setText(serial)
+            self.detail_device_summary.setText("Refresh the dashboard and reconnect the phone before inspecting it.")
+            self.detail_device_report.clear()
+        else:
+            name = item.data(Qt.ItemDataRole.UserRole + 2) or serial
+            state = item.data(Qt.ItemDataRole.UserRole + 1) or "unknown"
+            self.detail_device_name.setText(name)
+            self.detail_device_serial.setText(f"Serial: {serial} · ADB state: {state}")
+            self.detail_device_summary.setText("Device selected. Run a read-only inspection to load its technical summary.")
+            self.detail_device_report.setMarkdown(self.last_device_report if self.last_device_report else "")
+        self.pages.setCurrentWidget(self.device_detail)
+        self.page_title.setText("Device details")
+        self.page_subtitle.setText("Technical summary and read-only inspection results for the selected phone.")
+        self.home_button.setVisible(True)
+        self.nav.clearSelection()
+
+    def inspect_dashboard_device(self) -> None:
+        serial = getattr(self, "selected_dashboard_serial", "")
+        item = next(
+            (self.device_list.item(i) for i in range(self.device_list.count())
+             if self.device_list.item(i).data(Qt.ItemDataRole.UserRole) == serial),
+            None,
+        )
+        if item is None:
+            QMessageBox.warning(self, "Device not connected", "Return home, refresh the device list, and select a connected phone.")
+            return
+        self.device_list.setCurrentItem(item)
+        if item.data(Qt.ItemDataRole.UserRole + 1) != "device":
+            QMessageBox.warning(self, "Device not ready", f"ADB reports state {item.data(Qt.ItemDataRole.UserRole + 1)!r}. Check the help instructions and refresh.")
+            return
+        self.guided_inspection = False
+        self.inspect_device()
+
+    def go_home(self) -> None:
+        self.home_button.setVisible(False)
+        self.nav.setCurrentRow(0)
+        self.pages.setCurrentWidget(self.dashboard)
+        self.page_title.setText("Dashboard")
+        self.page_subtitle.setText("Your connected Android devices.")
+        self.refresh_devices()
+
+    def show_help(self) -> None:
+        """Show connection instructions and a local dependency availability check."""
+        checks = [
+            ("Python", sys.executable if sys.executable else ""),
+            ("ROMForge CLI", str(ROMFORGE) if ROMFORGE.is_file() else ""),
+            ("ADB / Android Platform-Tools", shutil.which("adb") or ""),
+            ("Git", shutil.which("git") or ""),
+        ]
+        lines = ["DEPENDENCY CHECK"]
+        for name, value in checks:
+            lines.append(f"{'✓ Available' if value else '✗ Not found'} — {name}" + (f": {value}" if value else ""))
+        try:
+            import PySide6  # noqa: F401
+            lines.append("✓ Available — PySide6")
+        except ImportError:
+            lines.append("✗ Not found — PySide6")
+        lines.extend([
+            "",
+            "HOW TO CONNECT A PHONE",
+            "1. Use a USB cable that supports data, not charging only.",
+            "2. Unlock the Android phone and enable Developer options and USB debugging.",
+            "3. Connect the phone and accept the USB debugging authorization prompt.",
+            "4. Return to the dashboard and click Refresh devices.",
+            "5. Select the phone tile, then choose Inspect / refresh details.",
+            "",
+            "If ADB is missing, install Android SDK Platform-Tools and add its platform-tools folder to PATH, then restart AndroidBuilder.",
+            "This check reports whether common tools are discoverable; it does not install dependencies or prove a device is compatible."
+        ])
+        QMessageBox.information(self, "AndroidBuilder help", "\\n".join(lines))
 
     def make_wizard(self) -> QWidget:
         page = QWidget()
