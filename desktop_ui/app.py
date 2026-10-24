@@ -1162,7 +1162,8 @@ class DesktopWindow(QMainWindow):
         if state != "device":
             QMessageBox.warning(self, "Device not ready", f"ADB reports state {state!r}. Unlock the phone and authorize USB debugging, then refresh.")
             return
-        if not skip_confirmation:\n            answer = QMessageBox.question(
+        if not skip_confirmation:
+            answer = QMessageBox.question(
                 self, "Read-only inspection",
                 f"Inspect {serial} using the existing Ubuntu Touch readiness checker?\n\nThis is read-only and does not flash or change the phone.",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
