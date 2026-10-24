@@ -160,42 +160,61 @@ class DesktopWindow(QMainWindow):
     def make_dashboard(self) -> QWidget:
         page = QWidget()
         box = QVBoxLayout(page)
-        row = QHBoxLayout()
-        self.python_card = self.card("PYTHON", "Checking…", "Runtime used by romforge")
-        self.git_card = self.card("GIT", "Checking…", "Source checkout and repository operations")
-        self.adb_card = self.card("ADB", "Checking…", "Optional connected-device access")
-        row.addWidget(self.python_card)
-        row.addWidget(self.git_card)
-        row.addWidget(self.adb_card)
-        box.addLayout(row)
-        summary = QFrame()
-        summary.setObjectName("card")
-        sb = QVBoxLayout(summary)
-        h = QLabel("Start here")
-        h.setObjectName("sectionTitle")
-        sb.addWidget(h)
-        sb.addWidget(QLabel("Create a build configuration, watch command output, or inspect a connected phone."))
+        box.setSpacing(18)
+
+        hero = QFrame()
+        hero.setObjectName("heroCard")
+        hero_box = QVBoxLayout(hero)
+        eyebrow = QLabel("ROM WORKSPACE")
+        eyebrow.setObjectName("eyebrow")
+        title = QLabel("Build with confidence.")
+        title.setObjectName("heroTitle")
+        intro = QLabel(
+            "Prepare a ROM build or check what is currently known about your connected phone. "
+            "Device detection is not the same as operating-system support."
+        )
+        intro.setObjectName("muted")
+        intro.setWordWrap(True)
+        hero_box.addWidget(eyebrow)
+        hero_box.addWidget(title)
+        hero_box.addWidget(intro)
         actions = QHBoxLayout()
         check_phone = make_button("Check my phone", True)
         check_phone.clicked.connect(self.open_device_check)
-        build = make_button("New build")
+        build = make_button("Start a build setup")
         build.clicked.connect(lambda: self.nav.setCurrentRow(1))
-        device = make_button("Refresh devices")
-        device.clicked.connect(self.refresh_devices)
-        device.clicked.connect(lambda: self.nav.setCurrentRow(3))
         actions.addWidget(check_phone)
         actions.addWidget(build)
-        actions.addWidget(device)
         actions.addStretch()
-        sb.addLayout(actions)
-        box.addWidget(summary)
-        warnings = QLabel(
-            "Builds run through the existing Python CLI. Full Android ROM compilation should use a supported "
-            "Ubuntu environment (or WSL2 Ubuntu on Windows). Review settings carefully before starting."
+        hero_box.addLayout(actions)
+        box.addWidget(hero)
+
+        section = QLabel("WORKFLOWS")
+        section.setObjectName("eyebrow")
+        box.addWidget(section)
+        cards = QHBoxLayout()
+        device_card = self.card(
+            "DEVICE READINESS",
+            "Inspect a phone",
+            "Read-only ADB checks show device-reported details and highlight what still needs verification."
         )
-        warnings.setObjectName("notice")
-        warnings.setWordWrap(True)
-        box.addWidget(warnings)
+        build_card = self.card(
+            "ROM BUILD",
+            "Configure a build",
+            "Review the target, source, backend, and disk requirements. The first run is a dry run."
+        )
+        cards.addWidget(device_card)
+        cards.addWidget(build_card)
+        box.addLayout(cards)
+
+        note = QLabel(
+            "Platform note: full Android ROM compilation is generally best run in a supported Ubuntu "
+            "environment (or Ubuntu under WSL2 on Windows). Python and Git are implementation prerequisites, "
+            "not project progress indicators."
+        )
+        note.setObjectName("notice")
+        note.setWordWrap(True)
+        box.addWidget(note)
         box.addStretch()
         return page
 
@@ -884,7 +903,7 @@ class DesktopWindow(QMainWindow):
             QPushButton:hover { background: #2a2a30; border-color: #4b4b55; }
             QPushButton#primaryButton { background: #6550a8; color: white; border-color: #8068ce; }
             QPushButton#primaryButton:hover { background: #7962bf; }
-            #statusPill { background: #142b27; color: #75cfc1; border: 1px solid #244a43; border-radius: 6px; padding: 9px; font-weight: 600; }
+            #heroCard { background: #1b1b21; border: 1px solid #34343e; border-radius: 10px; }\n            #heroTitle { color: #f5f3ff; font-size: 26px; font-weight: 700; padding-top: 4px; padding-bottom: 4px; }\n            #statusPill { background: #142b27; color: #75cfc1; border: 1px solid #244a43; border-radius: 6px; padding: 9px; font-weight: 600; }
             QProgressBar { border: 0; background: #29292e; border-radius: 4px; height: 8px; text-align: center; }
             QProgressBar::chunk { background: #58b9a9; border-radius: 4px; }
             QScrollBar:vertical { background: #151517; width: 10px; margin: 0; }
