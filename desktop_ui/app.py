@@ -569,40 +569,67 @@ class DesktopWindow(QMainWindow):
             )
 
     def find_device_image(self) -> None:
-        """Find a freely hosted Commons image matching the selected device."""
+        """Find a reusable Wikimedia Commons image, trying broader model searches."""
         item = self.device_list.currentItem()
-        model_name = item.data(Qt.ItemDataRole.UserRole + 2) if item else ""
-        if not model_name or model_name == item.data(Qt.ItemDataRole.UserRole):
-            model_name = "Sony Xperia R1"
-        query = urllib.parse.urlencode({
-            "action": "query", "format": "json", "generator": "search",
-            "gsrsearch": f"file:{model_name}", "gsrnamespace": "6",
-            "gsrlimit": "8", "prop": "imageinfo", "iiprop": "url|extmetadata",
-            "iiurlwidth": "900",
-        })
-        api_url = "https://commons.wikimedia.org/w/api.php?" + query
+        display_name = item.data(Qt.ItemDataRole.UserRole + 2) if item else ""
+        serial = item.data(Qt.ItemDataRole.UserRole) if item else ""
+        if not display_name:
+            QMessageBox.information(self, "Select a device", "Select a connected device first.")
+            return
+
+        # Exact Android model names rarely appear in Commons filenames. Try progressively
+        # broader searches, while keeping the result's license and source attribution.
+        search_terms = [display_name]
+        normalized = display_name.lower()
+        if "sm-a042f" in normalized or "a04e" in normalized:
+            search_terms.extend(["Samsung Galaxy A04e", "Samsung Galaxy A04", "Samsung smartphone"])
+        elif "g2199" in normalized or "xperia r1" in normalized:
+            search_terms.extend(["Sony Xperia R1", "Sony Xperia smartphone", "Sony smartphone"])
+        else:
+            search_terms.extend([display_name.split()[-1], "Android smartphone"])
+        search_terms = list(dict.fromkeys(term.strip() for term in search_terms if term.strip()))
+
+        self.device_image_data = None
+        self.device_image.clear()
         self.device_image.setText("Searching Wikimedia Commons…")
+        self.device_image_source.setText("Trying the device model and broader manufacturer searches…")
         QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
         try:
-            request = urllib.request.Request(api_url, headers={"User-Agent": "AndroidBuilder/1.0 (device image lookup)"})
-            with urllib.request.urlopen(request, timeout=12) as response:
-                payload = json.loads(response.read().decode("utf-8"))
-            pages = payload.get("query", {}).get("pages", {})
             chosen = None
-            for page in pages.values():
-                info = (page.get("imageinfo") or [{}])[0]
-                meta = info.get("extmetadata", {})
-                license_name = meta.get("LicenseShortName", {}).get("value", "")
-                if info.get("thumburl") and license_name:
-                    chosen = (info, meta, page.get("title", "Wikimedia Commons image"))
+            for term in search_terms:
+                query = urllib.parse.urlencode({
+                    "action": "query", "format": "json", "generator": "search",
+                    "gsrsearch": f"filetype:bitmap {term}", "gsrnamespace": "6",
+                    "gsrlimit": "12", "prop": "imageinfo", "iiprop": "url|extmetadata",
+                    "iiurlwidth": "900",
+                })
+                api_url = "https://commons.wikimedia.org/w/api.php?" + query
+                request = urllib.request.Request(
+                    api_url, headers={"User-Agent": "AndroidBuilder/1.0 (device image lookup)"}
+                )
+                with urllib.request.urlopen(request, timeout=12) as response:
+                    payload = json.loads(response.read().decode("utf-8"))
+                pages = payload.get("query", {}).get("pages", {})
+                for page in pages.values():
+                    info = (page.get("imageinfo") or [{}])[0]
+                    meta = info.get("extmetadata", {})
+                    license_name = meta.get("LicenseShortName", {}).get("value", "")
+                    if info.get("thumburl") and info.get("descriptionurl") and license_name:
+                        chosen = (info, meta, page.get("title", "Wikimedia Commons image"), term)
+                        break
+                if chosen:
                     break
+
             if not chosen:
-                self.device_image.setText("No suitable licensed image found. Try the source link below.")
+                self.device_image.setText("No licensed image found for this device.")
+                search_url = "https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search=" + urllib.parse.quote(display_name)
                 self.device_image_source.setText(
-                    f'<a href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search={urllib.parse.quote(model_name)}">Search Wikimedia Commons manually</a>'
+                    f'<a href="{search_url}">Search Wikimedia Commons manually</a><br>'
+                    "No suitable result was returned by the automatic search. You can still inspect the device without an image."
                 )
                 return
-            info, meta, title = chosen
+
+            info, meta, title, matched_term = chosen
             with urllib.request.urlopen(info["thumburl"], timeout=15) as response:
                 image_data = response.read()
             pixmap = QPixmap()
@@ -610,21 +637,23 @@ class DesktopWindow(QMainWindow):
                 raise ValueError("The image format could not be decoded.")
             self.device_image_data = image_data
             self.device_image.setPixmap(pixmap.scaled(
-                self.device_image.size(), Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation))
+                max(1, self.device_image.width()), max(1, self.device_image.height()),
+                Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation
+            ))
             license_name = meta.get("LicenseShortName", {}).get("value", "License not listed")
             artist = meta.get("Artist", {}).get("value", "Author not listed")
-            description = meta.get("ImageDescription", {}).get("value", "")
-            source_url = info.get("descriptionurl", "https://commons.wikimedia.org/")
+            source_url = info["descriptionurl"]
             self.device_image_source.setText(
-                f'<b>{title}</b><br>License: {license_name}<br>Author: {artist}<br>'
+                f'<b>{title}</b><br>Matched search: {matched_term}<br>'
+                f'License: {license_name}<br>Author: {artist}<br>'
                 f'<a href="{source_url}">Source and attribution</a>'
             )
         except (OSError, ValueError, json.JSONDecodeError, KeyError) as exc:
             self.device_image.setText("Image lookup failed")
+            search_url = "https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search=" + urllib.parse.quote(display_name)
             self.device_image_source.setText(
-                f"Could not retrieve an image: {exc}. "
-                f'<a href="https://commons.wikimedia.org/wiki/Special:MediaSearch?type=image&search={urllib.parse.quote(model_name)}">Open Commons search</a>'
+                f"Could not retrieve an image: {exc}<br>"
+                f'<a href="{search_url}">Open Commons search</a>'
             )
         finally:
             QApplication.restoreOverrideCursor()
