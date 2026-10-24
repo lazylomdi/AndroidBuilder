@@ -10,6 +10,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+from desktop_ui.readiness_summary import summarize_readiness_report
+
 from PySide6.QtCore import QProcess, Qt
 from PySide6.QtGui import QFont, QPixmap
 from PySide6.QtWidgets import (
@@ -490,8 +492,15 @@ class DesktopWindow(QMainWindow):
         self.device_output.setPlaceholderText("Inspect a selected phone to view its report.")
         self.device_output.setMinimumWidth(0)
         self.device_output.setFont(QFont("Segoe UI" if sys.platform == "win32" else "Noto Sans", 11))
+        self.device_output.setVisible(False)
         detail_box.addWidget(self.device_output, 2)
-        report_actions = QHBoxLayout()
+        self.technical_details_button = make_button("Show technical details")
+        self.technical_details_button.setCheckable(True)
+        self.technical_details_button.toggled.connect(self.toggle_technical_details)
+        detail_box.addWidget(self.technical_details_button)
+        self.report_actions_widget = QWidget()
+        report_actions = QHBoxLayout(self.report_actions_widget)
+        report_actions.setContentsMargins(0, 0, 0, 0)
         copy_report = make_button("Copy report")
         copy_report.clicked.connect(self.copy_device_report)
         export_report = make_button("Export report…")
@@ -499,7 +508,8 @@ class DesktopWindow(QMainWindow):
         report_actions.addWidget(copy_report)
         report_actions.addWidget(export_report)
         report_actions.addStretch()
-        detail_box.addLayout(report_actions)
+        detail_box.addWidget(self.report_actions_widget)
+        self.report_actions_widget.setVisible(False)
         splitter.addWidget(details)
         splitter.setStretchFactor(0, 0)
         splitter.setStretchFactor(1, 1)
@@ -947,27 +957,10 @@ class DesktopWindow(QMainWindow):
                     f"Inspection exited with code {code}, but no report was created. "
                     "See Build monitor for stdout/stderr."
                 )
-    @staticmethod
-    def summarize_readiness_report(report: str, exit_code: int = 0) -> str:
-        """Create a short plain-language summary without upgrading evidence status."""
-        lines = [line.strip() for line in report.splitlines() if line.strip()]
-        device_line = next(
-            (line for line in lines if any(key in line.lower() for key in ("manufacturer", "model", "codename")) and "|" in line),
-            "",
-        )
-        status_line = next(
-            (line for line in lines if "ubuntu touch" in line.lower() and any(word in line.lower() for word in ("unknown", "candidate", "verified", "blocked", "support"))),
-            "",
-        )
-        summary_parts = ["Inspection finished." if exit_code == 0 else f"Inspection finished with exit code {exit_code}."]
-        if device_line:
-            summary_parts.append(device_line.replace("|", " ·").strip("| "))
-        if status_line:
-            summary_parts.append(status_line.replace("|", " ·").strip("| "))
-        if not status_line:
-            summary_parts.append("Compatibility: not established by this report; review the findings below.")
-        summary_parts.append("ADB inspection is not proof of port support, bootability, or hardware functionality.")
-        return "\n".join(summary_parts)
+    def toggle_technical_details(self, expanded: bool) -> None:
+        self.device_output.setVisible(expanded)
+        self.report_actions_widget.setVisible(expanded)
+        self.technical_details_button.setText("Hide technical details" if expanded else "Show technical details")
 
     def process_error(self, _error: QProcess.ProcessError) -> None:
         self.log.appendPlainText(f"Process error: {self.process.errorString()}")
